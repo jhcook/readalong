@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+---
+Make the page conform to the platform settings such as dark mode on macOS. 
+
+Do not use emoticons in any output.
+
+Make the interface minimalist.
+
+Whenever generating web UI components that display cards, tiles, panels, or dashboard items:
+
+TBD

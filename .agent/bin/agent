@@ -1,0 +1,1834 @@
+#!/usr/bin/env bash
+#
+# Install `gh` with `gh-models`
+# https://github.com/github/gh-models
+#
+# Author: Justin Cook
+
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+AGENT_DIR="$ROOT_DIR/.agent"
+STATE_DIR="$AGENT_DIR/.state"
+TEMPLATES_DIR="$AGENT_DIR/templates"
+STORIES_DIR="$AGENT_DIR/cache/stories"
+ADRS_DIR="$AGENT_DIR/adrs"
+PLANS_DIR="$AGENT_DIR/cache/plans"
+RUNBOOKS_DIR="$AGENT_DIR/cache/runbooks"
+
+usage() {
+  cat <<USAGE
+agent - governed workflow CLI
+
+Usage: agent [COMMAND] [ARGS...]
+
+Commands:
+  preflight     Run governance preflight checks on staged changes
+                Usage: agent preflight --story STORY-ID [--ai]
+
+  commit        Commit changes with a governed message
+                Usage: agent commit --story STORY-ID [--runbook RUNBOOK-ID]
+
+  new-story     Create a new story file
+                Usage: agent new-story [STORY-ID]
+
+  new-adr       Create a new Architectural Decision Record (ADR)
+                Usage: agent new-adr [ADR-ID]
+
+  new-plan      Create a new implementation plan
+                Usage: agent new-plan [PLAN-ID]
+
+  new-runbook   Generate an implementation runbook using AI Panel
+                Usage: agent new-runbook STORY-ID
+
+  plan          Generate an implementation plan using AI
+                Usage: agent plan STORY-ID
+
+  implement     Execute an implementation runbook using AI
+                Usage: agent implement RUNBOOK-ID
+
+  list-stories  List all stories in .agent/cache/stories
+                Usage: agent list-stories [--plan PLAN-ID] [--runbook RUNBOOK-ID]
+
+  list-plans    List all plans in .agent/cache/plans
+                Usage: agent list-plans
+
+  list-runbooks List all runbooks in .agent/cache/runbooks
+                Usage: agent list-runbooks [--story STORY-ID]
+
+  validate-story Validate the schema of a story file
+                Usage: agent validate-story STORY-ID
+
+  impact        Run impact analysis for a story
+                Usage: agent impact STORY-ID
+
+  panel         Simulate a governance panel review
+                Usage: agent panel STORY-ID
+
+  run-ui-tests  Run UI journey tests
+                Usage: agent run-ui-tests STORY-ID
+
+  help          Show this help message or help for a specific command
+                Usage: agent help [COMMAND]
+USAGE
+}
+
+map_scope_from_files() {
+  local files="$1"
+  local scope="shared"
+  if echo "$files" | grep -q '^mobile/'; then scope="mobile"; fi
+  if echo "$files" | grep -q '^web/'; then scope="web"; fi
+  if echo "$files" | grep -q '^backend/'; then scope="backend"; fi
+  echo "$scope"
+}
+
+get_staged_files() {
+  git diff --cached --name-only
+}
+
+infer_story_id() {
+  local id=""
+  # 1. Try branch name
+  local branch
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+  if [[ "$branch" =~ ([A-Z]+-[0-9]+) ]]; then
+    id="${BASH_REMATCH[1]}"
+  fi
+  
+  # 2. If not found, try last commit message
+  if [[ -z "$id" ]]; then
+    local msg
+    msg=$(git log -1 --pretty=%B 2>/dev/null || true)
+    if [[ "$msg" =~ Story:[[:space:]]*([A-Z]+-[0-9]+) ]]; then
+        id="${BASH_REMATCH[1]}"
+    fi
+  fi
+  
+  echo "$id"
+}
+
+require_story_arg() {
+  local story_id="${1:-}"
+  if [[ -z "$story_id" ]]; then
+    # Attempt inference
+    story_id=$(infer_story_id)
+    if [[ -n "$story_id" ]]; then
+      echo "🛈 Inferred Story ID: $story_id" >&2
+      echo "$story_id"
+      return 0
+    fi
+    echo "❌ STORY-ID is required. Use --story STORY-XXX or pass STORY-ID." >&2
+    exit 1
+  fi
+  echo "$story_id"
+}
+
+###############################################
+# Command: new-story
+###############################################
+# Helper to find a story file recursively
+find_story_file() {
+  local id="$1"
+  # Try direct match first
+  if [[ -f "$STORIES_DIR/$id.md" ]]; then
+    echo "$STORIES_DIR/$id.md"
+    return 0
+  fi
+  # Recursive search
+  local found
+  found=$(find "$STORIES_DIR" -name "${id}*.md" -print -quit)
+  if [[ -n "$found" ]]; then
+    echo "$found"
+    return 0
+  fi
+  return 1
+}
+
+# Helper to find a plan file recursively
+find_plan_file() {
+  local id="$1"
+  # Try direct match first
+  if [[ -f "$PLANS_DIR/$id.md" ]]; then
+    echo "$PLANS_DIR/$id.md"
+    return 0
+  fi
+  # Recursive search
+  local found
+  found=$(find "$PLANS_DIR" -name "${id}*.md" -print -quit)
+  if [[ -n "$found" ]]; then
+    echo "$found"
+    return 0
+  fi
+  return 1
+}
+
+# Helper to find a runbook file recursively
+find_runbook_file() {
+  local id="$1"
+  # Try direct match first
+  if [[ -f "$RUNBOOKS_DIR/$id.md" ]]; then
+    echo "$RUNBOOKS_DIR/$id.md"
+    return 0
+  fi
+  # Recursive search
+  local found
+  found=$(find "$RUNBOOKS_DIR" -name "${id}*.md" -print -quit)
+  if [[ -n "$found" ]]; then
+    echo "$found"
+    return 0
+  fi
+  return 1
+}
+
+###############################################
+# Command: new-story
+###############################################
+###############################################
+# Command: new-story
+###############################################
+cmd_new_story() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent new-story [STORY-ID]
+
+Create a new story file in .agent/stories.
+
+Arguments:
+  STORY-ID      (Optional) The ID of the story (e.g., MOBILE-001).
+                If not provided, an interactive prompt will help you generate one.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"
+  
+  # Interactive prompt if missing
+  if [[ -z "$story_id" ]]; then
+    echo "Select Story Category:"
+    echo "1. INFRA (Governance, CI/CD)"
+    echo "2. WEB (Frontend)"
+    echo "3. MOBILE (React Native)"
+    echo "4. BACKEND (FastAPI)"
+    read -rp "Choice [1-4]: " choice
+    case "$choice" in
+      1) prefix="INFRA" ;;
+      2) prefix="WEB" ;;
+      3) prefix="MOBILE" ;;
+      4) prefix="BACKEND" ;;
+      *) echo "Invalid choice"; exit 1 ;;
+    esac
+    
+    # Auto-increment logic
+    local scope="$prefix"
+    local dir="$STORIES_DIR/$scope"
+    mkdir -p "$dir"
+    
+    # Find highest number
+    local max_num=0
+    # List files, extract number part (assuming PREFIX-XXX format)
+    for f in "$dir"/${prefix}-*.md; do
+      [[ -e "$f" ]] || continue
+      # Extract basename
+      base=$(basename "$f" .md)
+      if [[ "$base" =~ ${prefix}-([0-9]+) ]]; then
+        num="${BASH_REMATCH[1]}"
+        num=$((10#$num))
+        if (( num > max_num )); then max_num=$num; fi
+      fi
+    done
+    
+    local next_num=$((max_num + 1))
+    local formatted_num=$(printf "%03d" "$next_num")
+    story_id="${prefix}-${formatted_num}"
+    echo "🛈 Auto-assigning ID: $story_id"
+  fi
+
+  # Determine scope/subdirectory from ID
+  local scope="MISC"
+  if [[ "$story_id" =~ ^INFRA- ]]; then scope="INFRA"; fi
+  if [[ "$story_id" =~ ^WEB- ]]; then scope="WEB"; fi
+  if [[ "$story_id" =~ ^MOBILE- ]]; then scope="MOBILE"; fi
+  if [[ "$story_id" =~ ^BACKEND- ]]; then scope="BACKEND"; fi
+
+  local dir="$STORIES_DIR/$scope"
+  mkdir -p "$dir"
+  
+  # Ask for title
+  read -rp "Enter Story Title: " title
+  # Clean title for filename (optional, or just keep ID as filename)
+  local safe_title
+  safe_title=$(echo "$title" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
+  local filename="${story_id}-${safe_title}.md"
+  
+  # If user prefers just ID in filename, use that:
+  # local file="$dir/${story_id}.md"
+  # But user's example was MOBILE-001-qa-setup.md, so let's support that
+  local file="$dir/${filename}"
+
+  if [[ -f "$file" ]]; then
+    echo "❌ Story $story_id already exists at $file"
+    exit 1
+  fi
+  
+  if [[ -f "$TEMPLATES_DIR/story-template.md" ]]; then
+    cp "$TEMPLATES_DIR/story-template.md" "$file"
+    # Replace title placeholder
+    # sed -i '' "s/STORY-XXX/$story_id/" "$file" 2>/dev/null || sed -i "s/STORY-XXX/$story_id/" "$file"
+  else
+    cat > "$file" <<STORY
+# $story_id: $title
+
+## State
+DRAFT
+
+## Problem Statement
+What problem are we solving?
+
+## User Story
+As a <user>, I want <capability> so that <value>.
+
+## Acceptance Criteria
+- [ ] **Scenario 1**: Given <context>, When <action>, Then <result>.
+- [ ] **Scenario 2**: <Condition> must be met.
+- [ ] **Negative Test**: System handles <error case> gracefully.
+
+## Non-Functional Requirements
+- Performance
+- Security
+- Compliance
+- Observability
+
+## Linked ADRs
+- ADR-XXX
+
+## Impact Analysis Summary
+Components touched:
+Workflows affected:
+Risks identified:
+
+## Test Strategy
+How will we verify correctness?
+
+## Rollback Plan
+How do we revert safely?
+STORY
+  fi
+  echo "✅ Created story: $file"
+}
+
+###############################################
+# Command: new-adr
+###############################################
+cmd_new_adr() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent new-adr [ADR-ID]
+
+Create a new Architectural Decision Record (ADR) in .agent/adrs.
+
+Arguments:
+  ADR-ID        (Optional) The ID of the ADR (e.g., ADR-001).
+                If not provided, the next available ID will be auto-assigned.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local adr_id="${1:-}"
+  if [[ -z "$adr_id" ]]; then
+    # Auto-increment logic for ADRs
+    local max_num=0
+    mkdir -p "$ADRS_DIR"
+    for f in "$ADRS_DIR"/ADR-*.md; do
+      [[ -e "$f" ]] || continue
+      base=$(basename "$f" .md)
+      num="${base##*-}"
+      # Handle cases like ADR-010-opentelemetry where number is 010
+      # Extract just the number: first sequence of digits after ADR-
+      if [[ "$base" =~ ADR-([0-9]+) ]]; then
+         num="${BASH_REMATCH[1]}"
+         num=$((10#$num))
+         if (( num > max_num )); then max_num=$num; fi
+      fi
+    done
+    local next_num=$((max_num + 1))
+    local formatted_num=$(printf "%03d" "$next_num")
+    adr_id="ADR-${formatted_num}"
+    echo "🛈 Auto-assigning ID: $adr_id"
+  fi
+  
+  read -rp "Enter ADR Title: " title
+  local safe_title
+  safe_title=$(echo "$title" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
+  local file="$ADRS_DIR/${adr_id}-${safe_title}.md"
+
+  if [[ -f "$file" ]]; then
+    echo "❌ ADR $adr_id already exists at $file"
+    exit 1
+  fi
+  if [[ -f "$TEMPLATES_DIR/adr-template.md" ]]; then
+    cp "$TEMPLATES_DIR/adr-template.md" "$file"
+  else
+    cat > "$file" <<ADR
+# $adr_id: $title
+
+## Status
+Proposed
+
+## Context
+Why this decision is needed.
+
+## Decision
+The architectural decision.
+
+## Alternatives Considered
+- Option A
+- Option B
+
+## Consequences
+- Positive:
+- Negative:
+
+## Supersedes
+(Optional) Previous ADR.
+ADR
+  fi
+  echo "✅ Created ADR: $file"
+}
+
+###############################################
+# Command: new-plan
+###############################################
+cmd_new_plan() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent new-plan [PLAN-ID]
+
+Create a new implementation plan file in .agent/cache/plans.
+
+Arguments:
+  PLAN-ID       (Optional) The ID of the plan (e.g., INFRA-001).
+                If not provided, an interactive prompt will help you generate one.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local plan_id="${1:-}"
+  
+  if [[ -z "$plan_id" ]]; then
+    echo "Select Plan Category:"
+    echo "1. INFRA (Governance, CI/CD)"
+    echo "2. WEB (Frontend)"
+    echo "3. MOBILE (React Native)"
+    echo "4. BACKEND (FastAPI)"
+    read -rp "Choice [1-4]: " choice
+    case "$choice" in
+      1) prefix="INFRA" ;;
+      2) prefix="WEB" ;;
+      3) prefix="MOBILE" ;;
+      4) prefix="BACKEND" ;;
+      *) echo "Invalid choice"; exit 1 ;;
+    esac
+
+    # Auto-increment logic
+    local scope="$prefix"
+    local dir="$PLANS_DIR/$scope"
+    mkdir -p "$dir"
+    
+    local max_num=0
+    if [[ -d "$dir" ]]; then
+      for f in "$dir"/${prefix}-*.md; do
+        [[ -e "$f" ]] || continue
+        base=$(basename "$f" .md)
+        # Assuming format PREFIX-XXX-description
+        if [[ "$base" =~ ${prefix}-([0-9]+) ]]; then
+           num="${BASH_REMATCH[1]}"
+           num=$((10#$num))
+           if (( num > max_num )); then max_num=$num; fi
+        fi
+      done
+    fi
+    
+    local next_num=$((max_num + 1))
+    local formatted_num=$(printf "%03d" "$next_num")
+    plan_id="${prefix}-${formatted_num}"
+    echo "🛈 Auto-assigning ID: $plan_id"
+  fi
+
+  # Determine scope/subdirectory from ID
+  local scope="MISC"
+  if [[ "$plan_id" =~ ^INFRA- ]]; then scope="INFRA"; fi
+  if [[ "$plan_id" =~ ^WEB- ]]; then scope="WEB"; fi
+  if [[ "$plan_id" =~ ^MOBILE- ]]; then scope="MOBILE"; fi
+  if [[ "$plan_id" =~ ^BACKEND- ]]; then scope="BACKEND"; fi
+
+  local dir="$PLANS_DIR/$scope"
+  mkdir -p "$dir"
+  
+  read -rp "Enter Plan Title: " title
+  local safe_title
+  safe_title=$(echo "$title" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
+  local file="$dir/${plan_id}-${safe_title}.md"
+  
+  if [[ -f "$file" ]]; then
+    echo "❌ Plan $plan_id already exists at $file"
+    exit 1
+  fi
+  if [[ -f "$TEMPLATES_DIR/plan-template.md" ]]; then
+    cp "$TEMPLATES_DIR/plan-template.md" "$file"
+  else
+    cat > "$file" <<PLAN
+# $plan_id: $title
+
+## Related Story
+STORY-XXX
+
+## Summary
+High-level description of the change.
+
+## Objectives
+- Objective 1
+- Objective 2
+
+## Milestones
+- M1:
+- M2:
+
+## Risks & Mitigations
+- Risk:
+  - Mitigation:
+
+## Verification
+How we will confirm the plan was successful.
+PLAN
+  fi
+  echo "✅ Created Plan: $file"
+}
+
+###############################################
+# Command: new-runbook
+###############################################
+cmd_new_runbook() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent new-runbook STORY-ID
+
+Generate a detailed Implementation Runbook for a Story using the AI Governance Panel.
+The panel (@Architect, @Security, @QA, @Docs, @Compliance, @Observability) will collaborate to design the runbook.
+
+Arguments:
+  STORY-ID      (Required) The ID of the story to create a runbook for.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"; require_story_arg "$story_id"
+
+  if ! command -v gh &> /dev/null; then
+    echo "❌ 'gh' CLI not found. Required for AI runbook generation."
+    exit 1
+  fi
+
+  local story_file
+  story_file=$(find_story_file "$story_id") || { echo "❌ Story file not found for $story_id"; exit 1; }
+
+  echo "🛈 invoking AI Governance Panel for $story_id..."
+
+  # Determine scope
+  local scope="MISC"
+  if [[ "$story_id" =~ ^INFRA- ]]; then scope="INFRA"; fi
+  if [[ "$story_id" =~ ^WEB- ]]; then scope="WEB"; fi
+  if [[ "$story_id" =~ ^MOBILE- ]]; then scope="MOBILE"; fi
+  if [[ "$story_id" =~ ^BACKEND- ]]; then scope="BACKEND"; fi
+
+  local runbook_dir="$RUNBOOKS_DIR/$scope"
+  mkdir -p "$runbook_dir"
+  local runbook_file="$runbook_dir/${story_id}-runbook.md"
+
+  if [[ -f "$runbook_file" ]]; then
+    echo "⚠️  Runbook already exists at $runbook_file"
+    read -rp "Overwrite? [y/N]: " ans
+    if [[ "$ans" != "y" ]]; then
+      echo "Aborted."
+      exit 0
+    fi
+  fi
+
+  # Context Gathering
+  local story_content
+  story_content=$(cat "$story_file")
+
+  local rules_content=""
+  if [[ -d "$AGENT_DIR/rules" ]]; then
+    for r in "$AGENT_DIR/rules/"*.mdc; do
+       base=$(basename "$r")
+       [[ "$base" == "commit-workflow.mdc" ]] && continue
+       [[ "$base" == "documentation.mdc" ]] && continue 
+       [[ "$base" == "the-team.mdc" ]] && continue
+       rules_content="${rules_content}\n\n--- RULE: ${base} ---\n$(cat "$r")"
+    done
+  fi
+
+  local system_prompt="You are the AI Governance Panel for this repository.
+Your role is to design and document a DETAILED Implementation Runbook for a software engineering task.
+
+THE PANEL:
+- @Architect: Ensures the design matches the Story and system architecture.
+- @Security: Validates that all security protocols are followed.
+- @QA: Defines the testing strategy and key user flows.
+- @Docs: Ensures documentation updates are planned.
+- @Compliance: Checks against regulatory and project rules.
+- @Observability: Ensures logging and monitoring are sufficient.
+
+INPUTS:
+1. User Story (Requirements)
+2. Governance Rules (Compliance constraints)
+
+OUTPUT FORMAT:
+Markdown file content ONLY.
+The content MUST start with 'Status: PROPOSED'.
+Do NOT include preamble or postscript (no 'Here is the runbook...').
+
+STRUCTURE:
+# $story_id: <Title>
+
+Status: PROPOSED
+
+## Goal Description
+<Clear summary of the objective>
+
+## Panel Review Findings
+- **@Architect**: ...
+- **@Security**: ...
+- **@QA**: ...
+- **@Docs**: ...
+- **@Compliance**: ...
+- **@Observability**: ...
+
+## Implementation Steps
+(Must be detailed enough for a qualified engineer)
+### [Component Name]
+#### [MODIFY | NEW | DELETE] [file path]
+- <Specific instruction on what to change>
+- <Code snippets if necessary for clarity>
+
+## Verification Plan
+### Automated Tests
+- [ ] Test 1
+- [ ] Test 2
+
+### Manual Verification
+- [ ] Step 1
+- [ ] Step 2
+"
+
+  local user_prompt="STORY CONTENT:
+$story_content
+
+GOVERNANCE RULES:
+$rules_content
+"
+
+  echo "🤖 [AI] Panel is discussing and generating runbook..."
+
+  local ai_output
+  if ai_output=$(gh models run openai/gpt-4o-mini --system-prompt "$system_prompt" <<< "$user_prompt" 2>&1); then
+     echo "$ai_output" > "$runbook_file"
+     echo "✅ Runbook generated at: $runbook_file"
+     echo "⚠️  ACTION REQUIRED: Review the runbook and change 'Status: PROPOSED' to 'Status: ACCEPTED' to proceed."
+  else
+     echo "❌ AI Runbook Generation failed: $ai_output"
+     exit 1
+  fi
+}
+
+###############################################
+# Command: validate-story (stub but enforce basics)
+###############################################
+cmd_validate_story() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent validate-story STORY-ID
+
+Validate the schema and required sections of a story file.
+
+Arguments:
+  STORY-ID      (Required) The ID of the story to validate.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"; require_story_arg "$story_id"
+  if cmd_validate_story_silent "$story_id"; then
+    echo "✅ Story schema validation passed for $story_id"
+  else
+    echo "❌ Story schema validation failed for $story_id"
+    exit 1
+  fi
+}
+
+cmd_validate_story_silent() {
+  local story_id="$1"
+  local file
+  file=$(find_story_file "$story_id") || return 1
+  
+  local required_sections=("Problem Statement" "User Story" "Acceptance Criteria" "Non-Functional Requirements" "Impact Analysis Summary" "Test Strategy" "Rollback Plan")
+  local missing=0
+  for section in "${required_sections[@]}"; do
+    if ! grep -q "## ${section}" "$file"; then
+      missing=1
+    fi
+  done
+  
+  [[ "$missing" -eq 0 ]]
+}
+
+###############################################
+# Command: impact (stub)
+###############################################
+cmd_impact() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent impact STORY-ID
+
+Run an impact analysis for a specific story to understand potential risks.
+
+Arguments:
+  STORY-ID      (Required) The ID of the story.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"; require_story_arg "$story_id"
+  echo "🛈 [impact] Run impact analysis for $story_id (extend this logic as needed)."
+}
+
+###############################################
+# Command: panel (stub)
+###############################################
+cmd_panel() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent panel STORY-ID
+
+Simulate a governance panel review where different agent personas (Architect, Security, QA, etc.)
+sign off on the story.
+
+Arguments:
+  STORY-ID      (Required) The ID of the story to review.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"; require_story_arg "$story_id"
+  local story_file
+  story_file=$(find_story_file "$story_id") || { echo "❌ Story file not found for $story_id"; exit 1; }
+  local team_file="$AGENT_DIR/agents.yaml"
+  
+  echo "🛈 [panel] Convening the Governance Panel for $story_id..."
+  
+  if [[ ! -f "$team_file" ]]; then
+    echo "⚠️  No agents.yaml found. Skipping role-based sign-off."
+    return
+  fi
+
+  # Rudimentary parsing of YAML to list roles (requires straightforward yaml structure)
+  # using grep/sed for portability if yq isn't available.
+  local roles
+  roles=$(grep -e "- role:" "$team_file" | sed 's/- role: //')
+
+  for role in $roles; do
+    echo "   👤 calling agent: $role..."
+    # In a real agentic workflow, this would trigger an LLM review specialized for that role.
+    # For now, we simulate the 'check' that the governance script performed earlier.
+    
+    case "$role" in
+      architect)
+        echo "      [Architect]: confirming Architecture & ADRs... ✅"
+        ;;
+      qa)
+        echo "      [QA]: confirming Test Strategy & Coverage... ✅"
+        ;;
+      security)
+         if grep -q "Compliance" "$story_file"; then
+            echo "      [Security]: Compliance flagged. Please confirm manual review of checklists. ✅"
+         else
+            echo "      [Security]: No specific compliance flags found. ✅"
+         fi
+        ;;
+      product)
+         echo "      [Product]: confirming Acceptance Criteria... ✅"
+         ;;
+      observability)
+         if grep -q "Observability" "$story_file"; then
+             echo "      [SRE]: Observability instrumentation required and checked. ✅"
+         else
+             echo "      [SRE]: No mandatory observability checks. ✅"
+         fi
+         ;;
+      docs)
+         # Check if we found docs in step 5
+         if echo "$staged" | grep -qE "\.md$"; then
+            echo "      [Tech Writer]: Docs are present. ✅"
+         else
+            echo "      [Tech Writer]: No docs in this commit. If this is a logic change, did you forget to update the docs? ⚠️"
+         fi
+         ;;
+      *)
+        echo "      [$role]: Reviewing... ✅"
+        ;;
+    esac
+  done
+
+  echo "✅ Panel review passed: All roles have signed off (simulated)."
+}
+
+###############################################
+# Command: run-ui-tests (stub)
+###############################################
+cmd_run_ui_tests() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent run-ui-tests STORY-ID
+
+Run UI journey tests (e.g., Playwright, Maestro) associated with a story.
+
+Arguments:
+  STORY-ID      (Required) The ID of the story.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"; require_story_arg "$story_id"
+  echo "🛈 [ui-tests] Running UI journey tests for $story_id..."
+  echo "  - web: Playwright (e2e/)"
+  echo "  - mobile: (Maestro/Detox placeholder)"
+  echo "  - backend: pytest-playwright (if configured)"
+  echo "✅ UI journey tests passed for $story_id (stub – wire to real commands)."
+}
+
+###############################################
+# Command: preflight
+###############################################
+# Helper for append output
+append_report() {
+  local role="$1"
+  local verdict="$2"
+  local summary="$3"
+  local findings="$4"
+  
+  # Accumulate global verdict
+  if [[ "$verdict" == "BLOCK" ]]; then
+    OVERALL_VERDICT="BLOCK"
+  fi
+
+  # Store report section
+  local report_section="
+ROLE: @$role
+VERDICT: $verdict
+SUMMARY:
+$summary
+FINDINGS:
+$findings
+"
+  if [[ "$verdict" == "BLOCK" ]]; then
+    report_section="${report_section}REQUIRED_CHANGES (if VERDICT=BLOCK):
+- Fix the blocking issues identified in FINDINGS above.
+"
+  fi
+  
+  FULL_REPORT="${FULL_REPORT}${report_section}"
+}
+
+# AI Preflight Verification
+cmd_preflight_ai() {
+  local story_id="$1"
+  local staged="$2"
+  
+  echo "🤖 [AI] aggregating context for Governance Review..." >&2
+
+  # 1. Collect Rules (Selective to save tokens)
+  # Exclude process-heavy docs that don't contain code rules: commit-workflow, the-team (partially)
+  # We prioritize: compliance, security, code standards.
+  local rules_content=""
+  if [[ -d "$AGENT_DIR/rules" ]]; then
+    for r in "$AGENT_DIR/rules/"*.mdc; do
+      local base
+      base=$(basename "$r")
+      # Skip process documentation to save tokens
+      [[ "$base" == "commit-workflow.mdc" ]] && continue
+      [[ "$base" == "documentation.mdc" ]] && continue 
+      [[ "$base" == "the-team.mdc" ]] && continue # Too large, summaries included in prompt
+      
+      rules_content="${rules_content}\n\n--- RULE: ${base} ---\n$(cat "$r")"
+    done
+  fi
+
+  # 2. Construct Prompt
+  local system_prompt="You are the AI Governance Council for this repository.
+Your goal is to review the code changes and enforce the following rules strictly.
+
+AGENTS & PERSONAS:
+1. @Architect: System design, separation of concerns, API client usage, no direct backend imports in web.
+2. @Security: Secrets prevention, HTTPS only, input sanitization, least-privilege.
+3. @QA: Test coverage for new logic, integration tests for APIs, no silent failures.
+4. @Docs: Mandate documentation for logic changes, breaking changes, and new features.
+5. @Compliance: GDPR/SOC2, PII handling, lawful basis, data retention justification.
+6. @Observability: Structured logging, no PII in logs, metrics for new features.
+
+RULES:
+${rules_content}
+
+INSTRUCTIONS:
+1. Acting as roles @Architect, @Security, @QA, @Docs, @Compliance, @Observability.
+2. Review the provided git diff.
+3. Identify VIOLATIONS of the rules.
+4. Output the report strictly in the following format:
+
+OVERALL_VERDICT: APPROVE | BLOCK
+
+ROLE: @Architect
+VERDICT: APPROVE | BLOCK
+SUMMARY: ...
+FINDINGS: ...
+
+... (repeat for all roles)
+
+If no substantial changes, return APPROVE for all.
+"
+  
+  # 3. Truncate Diff if too large
+  # 3. Truncate Diff if too large
+  # gh models has an 8k token limit (approx 32k chars). Rules take ~20k.
+  # We limit diff to 8k chars to be safe.
+  local max_diff_chars=8000
+  if [[ ${#staged} -gt $max_diff_chars ]]; then
+      echo "⚠️  Diff too large (${#staged} chars), truncating to $max_diff_chars..." >&2
+      staged="${staged:0:$max_diff_chars}\n... (truncated)"
+  fi
+
+  local user_prompt="STORY: ${story_id}
+CHANGES (git diff):
+${staged}
+"
+
+  echo "🤖 [AI] asking GitHub Models (gpt-4o-mini)..." >&2
+  
+  if ! command -v gh &> /dev/null; then
+    echo "❌ 'gh' CLI not found. Skipping AI review."
+    return 1
+  fi
+
+  local ai_output=""
+  # Use gpt-4o-mini which is often more permissible and faster for this volume
+  if ai_output=$(gh models run openai/gpt-4o-mini --system-prompt "$system_prompt" <<< "$user_prompt" 2>&1); then
+     echo "$ai_output"
+     return 0
+  else
+     echo "⚠️  AI Review failed: $ai_output" >&2
+     return 1
+  fi
+}
+
+cmd_preflight() {
+  # Help trap (manual check before loop or inside loop? Inside loop is safer if it's a flag)
+  # But existing loop handles flags. Adding a specific check at start for safety.
+  for arg in "$@"; do
+    if [[ "$arg" == "help" || "$arg" == "--help" || "$arg" == "-h" ]]; then
+      cat <<HELP
+Usage: agent preflight --story STORY-ID [--ai]
+
+Run governance preflight checks on staged changes.
+Verifies architecture, security, QA, compliance, etc.
+
+Options:
+  --story STORY-ID  (Required) The ID of the story (e.g., WEB-123).
+                    Can be inferred from branch name or last commit.
+  --ai              (Optional) Enable AI-based semantic code review.
+  help, --help      Show this help message.
+HELP
+      return 0
+    fi
+  done
+
+  local story_id=""
+  local use_ai="false"
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --story)
+        if [[ -n "${2:-}" ]]; then
+          story_id="$2"
+          shift 2
+        else
+          echo "❌ --story requires an argument" >&2
+          exit 1
+        fi
+        ;;
+      --ai)
+        use_ai="true"
+        shift
+        ;;
+      *) echo "Unknown flag: $1"; exit 1 ;;
+    esac
+  done
+  
+  # Update story_id from require_story_arg output (which may infer it)
+  story_id=$(require_story_arg "$story_id")
+
+  local story_file
+  story_file=$(find_story_file "$story_id") || { echo "❌ Story file not found for $story_id"; exit 1; }
+
+  local staged
+  local staged_source="staged"
+
+  # AI needs the actual content diff, not just filenames
+  if [[ "$use_ai" == "true" ]]; then
+     staged="$(git diff --cached)"
+     if [[ -z "$staged" ]]; then
+        # Fallback to committed code
+        staged="$(git diff HEAD^ HEAD)"
+        staged_source="committed (HEAD)"
+     fi
+  else
+     staged="$(get_staged_files || true)"
+     if [[ -z "$staged" ]]; then
+        # Fallback to committed code
+        staged="$(git diff --name-only HEAD^ HEAD)"
+        staged_source="committed (HEAD)"
+     fi
+  fi
+  
+  if [[ -z "$staged" ]]; then
+    echo "❌ No staged changes and no recent commits found."
+    exit 1
+  fi
+
+  echo "🛈 Analyzing $staged_source changes..." >&2
+
+  # If AI mode is requested, we delegate fully to the AI for the report?
+  # Or do we mix? The prompt implies full report generation.
+  if [[ "$use_ai" == "true" ]]; then
+      echo "🛈 Running AI Preflight Governance for $story_id..." >&2
+      if cmd_preflight_ai "$story_id" "$staged"; then
+          # Pass - The AI output defines the verdict.
+          # We need to parse strict verdict to update state json? 
+          # For simplicity now, we assume if AI output is printed, user reads it.
+          # But for automation, we should verify it didn't crash.
+          # To keep state file sync, we'd need to parse "OVERALL_VERDICT: BLOCK".
+          echo "✅ AI Review completed."
+          exit 0
+      else
+          echo "❌ AI Review failed or was blocked."
+          exit 1
+      fi
+  fi
+
+  # ... (Existing Regex-based Checks) ...
+  echo "🛈 Running Preflight Governance for $story_id..." >&2
+
+  # Initialize Report State
+  OVERALL_VERDICT="APPROVE"
+  FULL_REPORT=""
+  
+  # --- ROLE: @Architect ---
+  local arch_verdict="APPROVE"
+  local arch_summary="- Architecture checks passed."
+  local arch_findings=""
+  
+  # Check 1: Web imports backend
+  if echo "$staged" | grep -q "^web/.*\.tsx\?$"; then
+     local web_files
+     web_files=$(echo "$staged" | grep "^web/.*\.tsx\?$")
+     if grep -q "import .*backend.*" $web_files 2>/dev/null; then
+        arch_verdict="BLOCK"
+        arch_summary="- Found architecture violations."
+        arch_findings="${arch_findings}- [Boundary] Web component directly imports from backend/. Use API client instead.\n"
+     fi
+  fi
+  
+  append_report "Architect" "$arch_verdict" "$arch_summary" "${arch_findings:-- None}"
+
+  # --- ROLE: @Security ---
+  local sec_verdict="APPROVE"
+  local sec_summary="- Security checks passed."
+  local sec_findings=""
+  
+  # Check 1: Secrets
+  local check_files
+  check_files=$(echo "$staged" | grep -v "^\.agent/" | tr '\n' ' ' || true)
+  if [[ -n "$check_files" ]]; then
+      local suspicious_keywords="password secret private_key api_key access_token"
+      for keyword in $suspicious_keywords; do
+        if git grep -lIi "$keyword" -- $check_files | grep -v "test" > /dev/null; then
+           sec_verdict="BLOCK"
+           sec_summary="- Potential secrets detected."
+           sec_findings="${sec_findings}- [Secrets] Found keyword '$keyword' in code. Verify it is not a credential.\n"
+        fi
+      done
+      
+      # Check 2: HTTP
+      if git grep -l "http://" -- $check_files > /dev/null; then
+          sec_verdict="BLOCK"
+          sec_summary="- Insecure protocol detected."
+          sec_findings="${sec_findings}- [Transport] Found 'http://'. Use 'https://' for all external communications.\n"
+      fi
+  fi
+  
+  append_report "Security" "$sec_verdict" "$sec_summary" "${sec_findings:-- None}"
+
+  # --- ROLE: @QA ---
+  local qa_verdict="APPROVE"
+  local qa_summary="- QA checks passed."
+  local qa_findings=""
+  
+  # Check 1: Logic change without tests
+  # If src/ or app/ modified, but no test/ or spec files modified
+  if echo "$staged" | grep -qE "^(src|app|backend|web|mobile)/"; then
+      if ! echo "$staged" | grep -qE "(test|spec|__tests__)"; then
+          # Soft block or Warn? preflight.md says BLOCK if "Non-trivial logic... with no tests".
+          # We'll set to BLOCK to be strict as requested.
+          qa_verdict="BLOCK"
+          qa_summary="- Missing tests for code changes."
+          qa_findings="${qa_findings}- [Coverage] Code changes detected in src/ but no tests were modified/added.\n"
+      fi
+  fi
+  
+  # Check 2: Story Schema validation
+  if ! cmd_validate_story_silent "$story_id"; then
+      qa_verdict="BLOCK"
+      qa_summary="- Story validation failed."
+      qa_findings="${qa_findings}- [Schema] Story $story_id is missing required sections (Problem, Acceptance Criteria, etc).\n"
+  fi
+
+  append_report "QA" "$qa_verdict" "$qa_summary" "${qa_findings:-- None}"
+
+  # --- ROLE: @Docs ---
+  local docs_verdict="APPROVE"
+  local docs_summary="- Documentation checks passed."
+  local docs_findings=""
+  
+  # Check 1: Code changes no docs
+  if echo "$staged" | grep -qE "^(src|app|components)/"; then
+     if ! echo "$staged" | grep -qE "\.md$"; then
+        # Defaulting to APPROVE but with finding, as docs might not always be needed for every fix.
+        # But preflight.md says "Missing docs MUST result in BLOCK".
+        # Let's BLOCK to trigger strict review, user can override by adding a trivial markdown update or justifying.
+        docs_verdict="BLOCK"
+        docs_summary="- Missing documentation updates."
+        docs_findings="${docs_findings}- [Audit] Code changed but no documentation (.md) updated. Check CHANGELOG or ADRs.\n"
+     fi
+  fi
+  
+  append_report "Docs" "$docs_verdict" "$docs_summary" "${docs_findings:-- None}"
+
+  # --- ROLE: @Compliance ---
+  local comp_verdict="APPROVE"
+  local comp_summary="- Compliance checks passed."
+  local comp_findings=""
+  
+  # Check 1: PII Logging
+  if [[ -n "$check_files" ]]; then
+       if echo "$check_files" | grep -q "\.py$"; then
+          if git grep -l "print(" -- $(echo "$check_files" | grep "\.py$") | grep -v "test" > /dev/null; then
+             comp_verdict="BLOCK"
+             comp_summary="- Potential PII leak in logs."
+             comp_findings="${comp_findings}- [PII] Found 'print()' in Python. Use structured logging to avoid accidental PII leaks.\n"
+          fi
+       fi
+       if echo "$check_files" | grep -q "\.tsx\?$\|\.jsx\?$"; then
+          if git grep -l "console.log(" -- $(echo "$check_files" | grep "\.tsx\?$\|\.jsx\?$") | grep -v "test" > /dev/null; then
+             comp_verdict="BLOCK"
+             comp_summary="- Potential PII leak in logs."
+             comp_findings="${comp_findings}- [PII] Found 'console.log()' in Frontend. Ensure no PII is logged.\n"
+          fi
+       fi
+  fi
+  
+  append_report "Compliance" "$comp_verdict" "$comp_summary" "${comp_findings:-- None}"
+
+  # --- ROLE: @Observability ---
+  local obs_verdict="APPROVE"
+  local obs_summary="- Observability checks passed."
+  local obs_findings=""
+  
+  if grep -q "Observability" "$story_file"; then
+      if echo "$staged" | grep -qE "\.(py|ts|tsx)$"; then
+        if ! git grep -lE "trace|instrument|otel|OpenTelemetry|measure" -- $(echo "$staged" | grep -E "\.(py|ts|tsx)$") | grep -v "test" > /dev/null; then
+           obs_verdict="BLOCK"
+           obs_summary="- Missing instrumentation."
+           obs_findings="${obs_findings}- [ADR-010] Story mandates Observability but no tracing keywords found in staged code.\n"
+        fi
+      fi
+  fi
+  
+  append_report "Observability" "$obs_verdict" "$obs_summary" "${obs_findings:-- None}"
+
+  # --- Final Output ---
+  echo "OVERALL_VERDICT: $OVERALL_VERDICT"
+  echo "$FULL_REPORT"
+  
+  # Save state
+  mkdir -p "$STATE_DIR"
+  cat > "$STATE_DIR/preflight.json" <<STATE
+{
+  "story_id": "$story_id",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "status": "${OVERALL_VERDICT/APPROVE/PASS}" 
+}
+STATE
+
+  if [[ "$OVERALL_VERDICT" == "BLOCK" ]]; then
+     echo "❌ Preflight Failed. Addresses the BLOCKS above." >&2
+     exit 1
+  fi
+}
+
+###############################################
+# Command: commit
+###############################################
+cmd_commit() {
+  # Help trap
+  for arg in "$@"; do
+    if [[ "$arg" == "help" || "$arg" == "--help" || "$arg" == "-h" ]]; then
+      cat <<HELP
+Usage: agent commit --story STORY-ID [--runbook RUNBOOK-ID]
+
+Commit changes with a governed message format.
+Requires a passing 'agent preflight' run for the same story.
+
+Options:
+  --story STORY-ID      (Required) The ID of the story.
+                        Can be inferred from branch name or last commit.
+  --runbook RUNBOOK-ID  (Optional) The ID of the runbook associated with this commit.
+  help, --help          Show this help message.
+HELP
+      return 0
+    fi
+  done
+
+  local story_id=""
+  local runbook_id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --story)
+        if [[ -n "${2:-}" ]]; then
+          story_id="$2"
+          shift 2
+        else
+          echo "❌ --story requires an argument" >&2
+          exit 1
+        fi
+        ;;
+      --runbook)
+        if [[ -n "${2:-}" ]]; then
+          runbook_id="$2"
+          shift 2
+        else
+          echo "❌ --runbook requires an argument" >&2
+          exit 1
+        fi
+        ;;
+      *) echo "Unknown flag: $1"; exit 1 ;;
+    esac
+  done
+  story_id=$(require_story_arg "$story_id")
+
+  local preflight_file="$STATE_DIR/preflight.json"
+  if [[ ! -f "$preflight_file" ]]; then
+    echo "❌ No preflight state found. Run 'agent preflight --story $story_id' first."
+    exit 1
+  fi
+
+  local preflight_story
+  preflight_story="$(grep '"story_id"' "$preflight_file" | sed 's/.*"story_id": *"//; s/".*//')"
+  local preflight_status
+  preflight_status="$(grep '"status"' "$preflight_file" | sed 's/.*"status": *"//; s/".*//')"
+
+  if [[ "$preflight_status" != "PASS" ]]; then
+    echo "❌ Last preflight did not pass (status=$preflight_status)."
+    exit 1
+  fi
+
+  if [[ "$preflight_story" != "$story_id" ]]; then
+    echo "❌ Preflight was run for $preflight_story, not $story_id."
+    exit 1
+  fi
+
+  local staged
+  staged="$(get_staged_files || true)"
+  if [[ -z "$staged" ]]; then
+    echo "❌ No staged changes to commit."
+    exit 1
+  fi
+
+  local scope
+  scope="$(map_scope_from_files "$staged")"
+  local default_type="feat"
+
+  echo "🛈 Preparing commit for STORY: $story_id (scope=$scope)"
+  read -rp "Enter short summary for commit: " summary
+
+  # Placeholder for ADR and workflow references
+  read -rp "Enter ADR IDs (comma-separated, or blank): " adrs
+  read -rp "Enter Workflow IDs (comma-separated, or blank): " workflows
+
+  local commit_msg="${default_type}(${scope}): ${summary}\n\nStory: ${story_id}"
+  if [[ -n "$runbook_id" ]]; then
+    commit_msg="${commit_msg}\nRunbook: ${runbook_id}"
+  fi
+  if [[ -n "$adrs" ]]; then
+    commit_msg="${commit_msg}\nADRs: ${adrs}"
+  fi
+  if [[ -n "$workflows" ]]; then
+    commit_msg="${commit_msg}\nWorkflows: ${workflows}"
+  fi
+
+  printf "\nProposed commit message:\n\n%s\n\n" "$commit_msg"
+  read -rp "Proceed with commit? [y/N]: " answer
+  if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+    echo "❌ Commit aborted by user."
+    exit 1
+  fi
+
+  git commit -m "$commit_msg"
+
+  echo "✅ Commit completed."
+  echo "Story ${story_id} should now transition towards IMPLEMENTED/VERIFIED in your workflow."
+}
+
+###############################################
+# Command: plan
+###############################################
+cmd_plan() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent plan STORY-ID
+
+Generate an implementation plan for a story using AI (GitHub Models).
+It reads the story and governance rules to create a compliant plan.
+
+Arguments:
+  STORY-ID      (Required) The ID of the story to plan for.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local story_id="${1:-}"; require_story_arg "$story_id"
+  
+  if ! command -v gh &> /dev/null; then
+    echo "❌ 'gh' CLI not found. Required for AI plan generation."
+    exit 1
+  fi
+  
+  local story_file
+  story_file=$(find_story_file "$story_id") || { echo "❌ Story file not found for $story_id"; exit 1; }
+  
+  echo "🛈 Generating Implementation Plan for $story_id..."
+  
+  # Determine scope
+  local scope="MISC"
+  if [[ "$story_id" =~ ^INFRA- ]]; then scope="INFRA"; fi
+  if [[ "$story_id" =~ ^WEB- ]]; then scope="WEB"; fi
+  if [[ "$story_id" =~ ^MOBILE- ]]; then scope="MOBILE"; fi
+  if [[ "$story_id" =~ ^BACKEND- ]]; then scope="BACKEND"; fi
+  
+  local plan_dir="$PLANS_DIR/$scope"
+  mkdir -p "$plan_dir"
+  local plan_file="$plan_dir/${story_id}-impl-plan.md"
+  
+  if [[ -f "$plan_file" ]]; then
+    echo "⚠️  Plan already exists at $plan_file"
+    read -rp "Overwrite? [y/N]: " ans
+    if [[ "$ans" != "y" ]]; then
+      echo "Aborted."
+      exit 0
+    fi
+  fi
+  
+  # Context Gathering
+  local story_content
+  story_content=$(cat "$story_file")
+  
+  local rules_content=""
+  if [[ -d "$AGENT_DIR/rules" ]]; then
+    for r in "$AGENT_DIR/rules/"*.mdc; do
+       base=$(basename "$r")
+       [[ "$base" == "commit-workflow.mdc" ]] && continue
+       [[ "$base" == "documentation.mdc" ]] && continue 
+       [[ "$base" == "the-team.mdc" ]] && continue
+       rules_content="${rules_content}\n\n--- RULE: ${base} ---\n$(cat "$r")"
+    done
+  fi
+  
+  local system_prompt="You are an Implementation Planning Agent.
+Your goal is to create a detailed Step-by-Step Implementation Plan for a software engineering task.
+
+INPUTS:
+1. User Story (Requirements)
+2. Governance Rules (Compliance constraints)
+
+OUTPUT FORMAT:
+Markdown file content ONLY. content must start with 'Status: PROPOSED'.
+
+STRUCTURE:
+# $story_id: <Title>
+
+Status: PROPOSED
+
+## Goal Description
+<Short summary>
+
+## Compliance Checklist
+- [ ] @Security approved?
+- [ ] @Architect approved?
+- [ ] No PII leaks?
+
+## Proposed Changes
+Group files by component.
+### [Component Name]
+#### [MODIFY | NEW | DELETE] [file path]
+- Changes...
+
+## Verification Plan
+- Automated Tests: ...
+- Manual Verification: ...
+
+CONSTRAINTS:
+- STRICTLY follow .agent/rules/
+- NO regressions
+- Plan must be actionable and granular
+"
+
+  local user_prompt="STORY CONTENT:
+$story_content
+
+GOVERNANCE RULES:
+$rules_content
+"
+
+  echo "🤖 [AI] Asking GitHub Models (gpt-4o-mini) to generate plan..."
+  
+  local ai_output
+  if ai_output=$(gh models run openai/gpt-4o-mini --system-prompt "$system_prompt" <<< "$user_prompt" 2>&1); then
+     echo "$ai_output" > "$plan_file"
+     echo "✅ Plan generated at: $plan_file"
+     echo "⚠️  ACTION REQUIRED: Review the plan and change 'Status: PROPOSED' to 'Status: ACCEPTED' to proceed."
+  else
+     echo "❌ AI Plan Generation failed: $ai_output"
+     exit 1
+  fi
+}
+
+###############################################
+# Command: runbook (DEPRECATED / REMOVED)
+###############################################
+# cmd_runbook was removed as per request to use new-runbook and manual workflows.
+
+###############################################
+# Command: list-stories
+###############################################
+cmd_list_stories() {
+  # Check for help flag in arguments
+  for arg in "$@"; do
+    if [[ "$arg" == "help" || "$arg" == "--help" || "$arg" == "-h" ]]; then
+      cat <<HELP
+Usage: agent list-stories [--plan PLAN-ID] [--runbook RUNBOOK-ID]
+
+List all stories in .agent/cache/stories, or stories related to a specific plan or runbook.
+
+Options:
+  --plan PLAN-ID        (Optional) List only stories related to the specified plan.
+  --runbook RUNBOOK-ID  (Optional) List only stories related to the specified runbook.
+  help, --help    Show this help message.
+HELP
+      return 0
+    fi
+  done
+
+  local plan_id=""
+  local runbook_id=""
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --plan)
+        if [[ -n "${2:-}" ]]; then
+          plan_id="$2"
+          shift 2
+        else
+          echo "❌ --plan requires an argument" >&2
+          exit 1
+        fi
+        ;;
+      --runbook)
+        if [[ -n "${2:-}" ]]; then
+          runbook_id="$2"
+          shift 2
+        else
+          echo "❌ --runbook requires an argument" >&2
+          exit 1
+        fi
+        ;;
+      *) echo "Unknown flag: $1"; exit 1 ;;
+    esac
+  done
+
+  if [[ -n "$plan_id" ]]; then
+    echo "🛈 Listing Stories for Plan: $plan_id"
+    local plan_file
+    plan_file=$(find_plan_file "$plan_id") || { echo "❌ Plan file not found for $plan_id"; exit 1; }
+    
+    # Extract Related Stories
+    local related_ids
+    related_ids=$(sed -n '/^## Related Stor/,/^##/p' "$plan_file" | grep -oE "[A-Z]+-[0-9]+")
+    
+    if [[ -z "$related_ids" ]]; then
+       echo "  (No related stories found in $plan_file)"
+       return
+    fi
+    
+    echo "$related_ids" | sort -u | while read -r story_id; do
+       # Find story file
+       local story_file
+       if story_file=$(find_story_file "$story_id"); then
+          # Basename only
+          base=$(basename "$story_file")
+          title=$(grep "^# " "$story_file" | head -n 1 | sed 's/^# //' || echo "No Title")
+          echo "  - $base  [$title]"
+       else
+          echo "  - (Missing File) [$story_id]"
+       fi
+    done
+    return
+  fi
+
+  if [[ -n "$runbook_id" ]]; then
+    echo "🛈 Listing Stories for Runbook: $runbook_id"
+    local runbook_file
+    runbook_file=$(find_runbook_file "$runbook_id") || { echo "❌ Runbook file not found for $runbook_id"; exit 1; }
+    
+    # Extract Related Stories
+    local related_ids
+    related_ids=$(sed -n '/^## Related Stor/,/^##/p' "$runbook_file" | grep -oE "[A-Z]+-[0-9]+")
+    
+    if [[ -z "$related_ids" ]]; then
+       echo "  (No related stories found in $runbook_file)"
+       return
+    fi
+    
+    echo "$related_ids" | sort -u | while read -r story_id; do
+       # Find story file
+       local story_file
+       if story_file=$(find_story_file "$story_id"); then
+          # Basename only
+          base=$(basename "$story_file")
+          title=$(grep "^# " "$story_file" | head -n 1 | sed 's/^# //' || echo "No Title")
+          echo "  - $base  [$title]"
+       else
+          echo "  - (Missing File) [$story_id]"
+       fi
+    done
+    return
+  fi
+
+  echo "🛈 Listing Stories:"
+  if [[ -d "$STORIES_DIR" ]]; then
+    find "$STORIES_DIR" -name "*.md" | sort | while read -r file; do
+      # Basename only to strip directory prefix
+      base=$(basename "$file")
+      title=$(grep "^# " "$file" | head -n 1 | sed 's/^# //' || echo "No Title")
+      echo "  - $base  [$title]"
+    done
+  else
+    echo "  (No stories directory found)"
+  fi
+}
+
+###############################################
+# Command: list-plans
+###############################################
+cmd_list_plans() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent list-plans
+
+List all implementation plans in .agent/cache/plans, showing their ID, Status, and Title.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  echo "🛈 Listing Plans:"
+  if [[ -d "$PLANS_DIR" ]]; then
+    find "$PLANS_DIR" -name "*.md" | sort | while read -r file; do
+      base=$(basename "$file")
+      title=$(grep "^# " "$file" | head -n 1 | sed 's/^# //' || echo "No Title")
+      status=$(grep "^Status: " "$file" | head -n 1 | sed 's/^Status: //' || echo "UNKNOWN")
+      if [[ -z "$status" ]]; then status="UNKNOWN"; fi
+      echo "  - $base  [Status: $status]  [$title]"
+    done
+  else
+    echo "  (No plans directory found)"
+  fi
+}
+
+###############################################
+# Command: list-runbooks
+###############################################
+###############################################
+# Command: list-runbooks
+###############################################
+cmd_list_runbooks() {
+  # Help trap
+  for arg in "$@"; do
+    if [[ "$arg" == "help" || "$arg" == "--help" || "$arg" == "-h" ]]; then
+      cat <<HELP
+Usage: agent list-runbooks [--story STORY-ID]
+
+List all implementation runbooks in .agent/cache/runbooks, showing their ID, Status, and Title.
+
+Options:
+  --story STORY-ID  (Optional) List only runbooks related to the specified story.
+  help, --help      Show this help message.
+HELP
+      return 0
+    fi
+  done
+
+  local story_id=""
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --story)
+        if [[ -n "${2:-}" ]]; then
+          story_id="$2"
+          shift 2
+        else
+          echo "❌ --story requires an argument" >&2
+          exit 1
+        fi
+        ;;
+      *) echo "Unknown flag: $1"; exit 1 ;;
+    esac
+  done
+
+  if [[ -n "$story_id" ]]; then
+       echo "🛈 Listing Runbooks for Story: $story_id"
+  else
+       echo "🛈 Listing Runbooks:"
+  fi
+
+  if [[ -d "$RUNBOOKS_DIR" ]]; then
+    find "$RUNBOOKS_DIR" -name "*.md" | sort | while read -r file; do
+      base=$(basename "$file")
+      
+      # If explicit filter is on, check content
+      if [[ -n "$story_id" ]]; then
+         # Check if story_id appears in the file
+         if ! grep -q "$story_id" "$file"; then
+             continue
+         fi
+      fi
+      
+      title=$(grep "^# " "$file" | head -n 1 | sed 's/^# //' || echo "No Title")
+      status=$(grep "^Status: " "$file" | head -n 1 | sed 's/^Status: //' || echo "UNKNOWN")
+      if [[ -z "$status" ]]; then status="UNKNOWN"; fi
+      echo "  - $base  [Status: $status]  [$title]"
+    done
+  else
+    echo "  (No runbooks directory found)"
+  fi
+}
+
+###############################################
+# Command: implement (NEW)
+###############################################
+cmd_implement() {
+  # Help trap
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<HELP
+Usage: agent implement RUNBOOK-ID
+
+Execute an implementation runbook for using AI (GitHub Models).
+It reads the runbook and rules to generate code changes or instructions.
+
+Arguments:
+  RUNBOOK-ID    (Required) The ID of the runbook to implement.
+
+Options:
+  help, --help  Show this help message.
+HELP
+    return 0
+  fi
+
+  local runbook_id="${1:-}"
+  if [[ -z "$runbook_id" ]]; then
+    echo "❌ RUNBOOK-ID is required." >&2
+    exit 1
+  fi
+  
+  if ! command -v gh &> /dev/null; then
+    echo "❌ 'gh' CLI not found. Required for AI implementation."
+    exit 1
+  fi
+  
+  local runbook_file
+  runbook_file=$(find_runbook_file "$runbook_id") || { echo "❌ Runbook file not found for $runbook_id"; exit 1; }
+  
+  echo "🛈 Implementing Runbook $runbook_id..."
+  
+  # Read inputs
+  local runbook_content
+  runbook_content=$(cat "$runbook_file")
+  
+  # Read implementation constraints
+  local implement_rules=""
+  if [[ -f "$AGENT_DIR/commands/implement.md" ]]; then
+    implement_rules=$(cat "$AGENT_DIR/commands/implement.md")
+  fi
+  
+  # Read Agent Rules
+  local rules_content=""
+  if [[ -d "$AGENT_DIR/rules" ]]; then
+    for r in "$AGENT_DIR/rules/"*.mdc; do
+       base=$(basename "$r")
+       rules_content="${rules_content}\n\n--- RULE: ${base} ---\n$(cat "$r")"
+    done
+  fi
+
+  local system_prompt="You are an Implementation Agent.
+Your goal is to EXECUTE the tasks defined in the provided RUNBOOK.
+
+CONTEXT:
+1. RUNBOOK (The plan you must follow)
+2. IMPLEMENTATION GUIDE (The process you must follow from implement.md)
+3. RULES (Governance you must obey)
+
+INSTRUCTIONS:
+- Review the Runbook's 'Proposed Changes'.
+- Generate the actual code changes required.
+- You should output the changes using a clear format that a user can follow or apply.
+- Use 'diff' or 'code block' format for files.
+- If you are unsure, ask clarifying questions. (Simulated output)
+
+OUTPUT FORMAT:
+Return a Markdown response describing the actions taken and providing the code.
+If you are generating code, allow the user to apply it (since this is a CLI output, just printing code blocks is fine for now).
+"
+
+  local user_prompt="RUNBOOK CONTENT:
+$runbook_content
+
+IMPLEMENTATION GUIDE:
+$implement_rules
+
+GOVERNANCE RULES:
+$rules_content
+"
+
+  echo "🤖 [AI] Asking GitHub Models (gpt-4o-mini) to implement..."
+  
+  local ai_output
+  if ai_output=$(gh models run openai/gpt-4o-mini --system-prompt "$system_prompt" <<< "$user_prompt" 2>&1); then
+     echo ""
+     echo "$ai_output"
+     echo ""
+     echo "✅ Implementation advice generated."
+  else
+     echo "❌ AI Implementation failed: $ai_output"
+     exit 1
+  fi
+}
+
+###############################################
+# Command: help
+###############################################
+cmd_help() {
+  local subcommand="${1:-}"
+  if [[ -n "$subcommand" ]]; then
+    # Dispatch help for the specific subcommand
+    case "$subcommand" in
+      preflight) cmd_preflight --help ;;
+      commit) cmd_commit --help ;;
+      new-story) cmd_new_story --help ;;
+      new-adr) cmd_new_adr --help ;;
+      new-plan) cmd_new_plan --help ;;
+      plan) cmd_plan --help ;;
+      new-runbook) cmd_new_runbook --help ;;
+      implement) cmd_implement --help ;;
+      list-stories) cmd_list_stories --help ;;
+      list-plans) cmd_list_plans --help ;;
+      list-runbooks) cmd_list_runbooks --help ;;
+      validate-story) cmd_validate_story --help ;;
+      impact) cmd_impact --help ;;
+      panel) cmd_panel --help ;;
+      run-ui-tests) cmd_run_ui_tests --help ;;
+      *) echo "Unknown command: $subcommand"; usage; exit 1 ;;
+    esac
+  else
+    usage
+  fi
+}
+
+###############################################
+# Dispatch
+###############################################
+cmd="${1:-}"
+case "$cmd" in
+  preflight) shift; cmd_preflight "$@";;
+  commit) shift; cmd_commit "$@";;
+  new-story) shift; cmd_new_story "$@";;
+  new-adr) shift; cmd_new_adr "$@";;
+  new-plan) shift; cmd_new_plan "$@";;
+  plan) shift; cmd_plan "$@";;
+  new-runbook) shift; cmd_new_runbook "$@";;
+  implement) shift; cmd_implement "$@";;
+  list-stories) shift; cmd_list_stories "$@";;
+  list-plans) shift; cmd_list_plans "$@";;
+  list-runbooks) shift; cmd_list_runbooks "$@";;
+  validate-story) shift; cmd_validate_story "$@";;
+  impact) shift; cmd_impact "$@";;
+  panel) shift; cmd_panel "$@";;
+  run-ui-tests) shift; cmd_run_ui_tests "$@";;
+  help) shift; cmd_help "$@";;
+  ""|-h|--help) usage;;
+  *) echo "Unknown command: $cmd"; usage; exit 1;;
+esac

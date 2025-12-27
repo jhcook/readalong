@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "ReadAlong",
+  "version": "0.1.0",
+  "description": "Extract text from webpages for a clean reading experience.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

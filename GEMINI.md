@@ -9,6 +9,7 @@ entire monorepo.
 - Enforce all ADRs in `.agent/adrs/`.
 - Enforce architecture + compliance guardrails.
 - Follow workflows in `.agent/workflows/`.
+- Use commands in `.agent/commands/`.
 - Run preflight checks before implementation.
 - Defer language/framework rules to per‑app GEMINI.md files.
 

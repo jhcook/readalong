@@ -1,0 +1,65 @@
+.readalong-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2147483647;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.readalong-container {
+  width: 80%;
+  max-width: 800px;
+  height: 80%;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.readalong-header {
+  padding: 15px 25px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.readalong-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.readalong-close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #666;
+  line-height: 1;
+}
+
+.readalong-close-btn:hover {
+  color: #000;
+}
+
+.readalong-content {
+  padding: 30px 40px;
+  overflow-y: auto;
+  line-height: 1.6;
+  font-size: 1.2rem;
+  color: #222;
+}
+
+.readalong-content p {
+  margin-bottom: 1.5rem;
+}

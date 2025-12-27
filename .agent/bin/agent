@@ -1018,14 +1018,14 @@ HELP
      staged="$(git diff --cached)"
      if [[ -z "$staged" ]]; then
         # Fallback to committed code
-        staged="$(git diff HEAD^ HEAD)"
+        staged="$(git diff HEAD^ HEAD 2>/dev/null || git show --format="" HEAD)"
         staged_source="committed (HEAD)"
      fi
   else
      staged="$(get_staged_files || true)"
      if [[ -z "$staged" ]]; then
         # Fallback to committed code
-        staged="$(git diff --name-only HEAD^ HEAD)"
+        staged="$(git diff --name-only HEAD^ HEAD 2>/dev/null || git show --name-only --format="" HEAD)"
         staged_source="committed (HEAD)"
      fi
   fi

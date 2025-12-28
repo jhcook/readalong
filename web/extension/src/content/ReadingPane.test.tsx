@@ -250,4 +250,36 @@ describe('ReadingPane', () => {
 
     expect(mockSpeak).toHaveBeenCalledTimes(2);
   });
+
+  it('displays error message when fetching voices fails', async () => {
+    // Mock ElevenLabsClient.getVoices failure
+    const mockGetVoices = jest.fn().mockRejectedValue('Invalid API Key');
+    require('./services/ElevenLabsClient').ElevenLabsClient.getVoices = mockGetVoices;
+
+    render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+    // Open Settings and select ElevenLabs
+    const settingsButton = screen.getByTitle('Settings');
+    act(() => { settingsButton.click(); });
+
+    // Select Voice Source logic is inside the component, we need to trigger it.
+    // However, the component loads settings on mount. We can mock the initial state?
+    // Or simpler: change the select value.
+    const sourceSelect = screen.getByText('System Voices').closest('select') as HTMLSelectElement;
+    // Wait, the select has label "Voice Source". 
+    // Let's find by label if possible or just use display value.
+    // The previous test didn't cover this deep. Let's rely on text presence.
+
+    // Switch to ElevenLabs
+    fireEvent.change(screen.getByDisplayValue('System Voices'), { target: { value: 'elevenlabs' } });
+
+    // Enter API Key
+    const paramsInput = screen.getByPlaceholderText('sk-...');
+    fireEvent.change(paramsInput, { target: { value: 'invalid-key' } });
+
+    // Wait for the error to appear
+    await waitFor(() => {
+      expect(screen.getByText('Error: Invalid API Key')).toBeInTheDocument();
+    });
+  });
 });

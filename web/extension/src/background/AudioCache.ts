@@ -34,7 +34,7 @@ export class AudioCache {
         return this.dbPromise;
     }
 
-    async getAudio(id: string): Promise<Blob | null> {
+    async getAudio(id: string): Promise<{ blob: Blob, alignment?: any } | null> {
         const db = await this.init();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction([this.storeName], 'readonly');
@@ -48,7 +48,7 @@ export class AudioCache {
 
             request.onsuccess = () => {
                 if (request.result) {
-                    resolve(request.result.blob);
+                    resolve({ blob: request.result.blob, alignment: request.result.alignment });
                 } else {
                     resolve(null);
                 }
@@ -56,12 +56,12 @@ export class AudioCache {
         });
     }
 
-    async saveAudio(id: string, blob: Blob): Promise<void> {
+    async saveAudio(id: string, blob: Blob, alignment?: any): Promise<void> {
         const db = await this.init();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction([this.storeName], 'readwrite');
             const store = transaction.objectStore(this.storeName);
-            const request = store.put({ id, blob, timestamp: Date.now() });
+            const request = store.put({ id, blob, alignment, timestamp: Date.now() });
 
             request.onerror = () => reject('Error saving blob');
             request.onsuccess = () => resolve();

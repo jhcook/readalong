@@ -36,13 +36,13 @@ export class ElevenLabsClient {
         });
     }
 
-    static async generateAudio(apiKey: string, voiceId: string, text: string): Promise<string> {
+    static async generateAudio(apiKey: string, voiceId: string, text: string): Promise<{ audioData: string, alignment?: any }> {
         const tracer = trace.getTracer('readalong-extension');
         return tracer.startActiveSpan('ElevenLabsClient.generateAudio', async (span) => {
             span.setAttribute('elevenlabs.voice_id', voiceId);
             span.setAttribute('elevenlabs.text_length', text.length);
 
-            return new Promise<string>((resolve, reject) => {
+            return new Promise<{ audioData: string, alignment?: any }>((resolve, reject) => {
                 chrome.runtime.sendMessage({ type: 'GENERATE_AUDIO', apiKey, voiceId, text }, (response) => {
                     if (chrome.runtime.lastError) {
                         span.recordException(chrome.runtime.lastError.message || 'Unknown error');
@@ -52,7 +52,7 @@ export class ElevenLabsClient {
                     }
                     if (response && response.success) {
                         span.end();
-                        resolve(response.audioData); // Data URL
+                        resolve({ audioData: response.audioData, alignment: response.alignment }); // Data URL + Alignment
                     } else {
                         const err = response?.error || 'Unknown error generating audio';
                         span.recordException(err);

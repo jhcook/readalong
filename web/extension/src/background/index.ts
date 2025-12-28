@@ -30,8 +30,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     'xi-api-key': apiKey
                 }
             })
-                .then(res => {
-                    if (!res.ok) throw new Error(res.statusText);
+                .then(async res => {
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        throw new Error(`API Error: ${res.status} ${errorText}`);
+                    }
                     return res.json();
                 })
                 .then(data => {
@@ -60,16 +63,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const id = await generateId(voiceId, text);
 
                 // 1. Check Cache
-                const cachedBlob = await audioCache.getAudio(id);
-                if (cachedBlob) {
+                const cachedData = await audioCache.getAudio(id);
+                if (cachedData) {
                     console.log('Background: Cache hit for', id);
                     span.addEvent('cache_hit');
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        sendResponse({ success: true, audioData: reader.result }); // Base64
+                        sendResponse({ success: true, audioData: reader.result, alignment: cachedData.alignment }); // Base64
                         span.end();
                     };
-                    reader.readAsDataURL(cachedBlob);
+                    reader.readAsDataURL(cachedData.blob);
                     return;
                 }
 
@@ -77,7 +80,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 // 2. Fetch from API
                 console.log('Background: Fetching from ElevenLabs...');
-                const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`, {
                     method: 'POST',
                     headers: {
                         'xi-api-key': apiKey,
@@ -94,18 +97,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 });
 
                 if (!resp.ok) {
-                    throw new Error(`API Error: ${resp.status}`);
+                    const errorText = await resp.text();
+                    throw new Error(`API Error: ${resp.status} ${errorText}`);
                 }
 
-                const blob = await resp.blob();
+                const data = await resp.json();
+                const audioBase64 = data.audio_base64;
+                const alignment = data.alignment;
+
+                if (!audioBase64) {
+                    throw new Error('No audio data received');
+                }
+
+                // Convert base64 to Blob
+                const byteCharacters = atob(audioBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'audio/mpeg' });
+
 
                 // 3. Cache it
-                await audioCache.saveAudio(id, blob);
+                await audioCache.saveAudio(id, blob, alignment);
 
                 // 4. Return as Data URL
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    sendResponse({ success: true, audioData: reader.result });
+                    sendResponse({ success: true, audioData: reader.result, alignment: alignment });
                     span.end();
                 };
                 reader.readAsDataURL(blob);

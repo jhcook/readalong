@@ -5,6 +5,7 @@ import { SttEngine } from './audio/SttEngine';
 import { Aligner, RecognizedWord } from './alignment/Aligner';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { ElevenLabsClient, Voice } from './services/ElevenLabsClient';
+import { ChunkManager, AudioChunk } from './audio/ChunkManager';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 
 interface ReadingPaneProps {
@@ -45,15 +46,29 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Voice Preferences
+  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs'>('system');
+  const [systemVoiceURI, setSystemVoiceURI] = useState<string>('');
+
   // ElevenLabs State
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState<string>('');
   const [clonedVoices, setClonedVoices] = useState<Voice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
   const [isLoadingVoices, setIsLoadingVoices] = useState<boolean>(false);
+  const [voiceFetchError, setVoiceFetchError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Predictive Highlighting Ref
-  const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Chunked Playback State
+  const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([]);
+  const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(-1);
+  const audioChunksRef = useRef<AudioChunk[]>([]); // Ref to access latest chunks in callbacks/effects without stale closures
+
+  // Keep ref synced
+  useEffect(() => {
+    audioChunksRef.current = audioChunks;
+  }, [audioChunks]);
+
+  // Predictive Highlighting Ref - REMOVED
 
   // Load voices
   useEffect(() => {
@@ -72,6 +87,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   // Recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [activeAudioUrl, setActiveAudioUrl] = useState<string | null>(null); // Unified playback URL
+  const [currentAlignment, setCurrentAlignment] = useState<any>(null); // Store ElevenLabs alignment data
+
   const audioRecorder = useRef<AudioRecorder>(new AudioRecorder());
   const sttEngine = useRef<SttEngine>(new SttEngine());
   const aligner = useRef<Aligner>(new Aligner());
@@ -91,33 +109,42 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId'], (result: any) => {
+      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI'], (result: any) => {
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
         if (result.elevenLabsApiKey) setElevenLabsApiKey(result.elevenLabsApiKey);
         if (result.selectedVoiceId) setSelectedVoiceId(result.selectedVoiceId);
+        if (result.voiceSource) setVoiceSource(result.voiceSource);
+        if (result.systemVoiceURI) setSystemVoiceURI(result.systemVoiceURI);
       });
     }
   }, []);
 
   // Fetch voices when API key is set
   useEffect(() => {
-    if (elevenLabsApiKey && isSettingsOpen) {
+    if (elevenLabsApiKey && isSettingsOpen && voiceSource === 'elevenlabs') {
+      const trimmedKey = elevenLabsApiKey.trim();
+      if (!trimmedKey) return;
+
       setIsLoadingVoices(true);
-      ElevenLabsClient.getVoices(elevenLabsApiKey)
+      setVoiceFetchError(null);
+      ElevenLabsClient.getVoices(trimmedKey)
         .then(voices => setClonedVoices(voices))
-        .catch(err => console.error("Failed to load voices", err))
+        .catch(err => {
+          console.error("Failed to load voices", err);
+          setVoiceFetchError(typeof err === 'string' ? err : (err.message || String(err)));
+        })
         .finally(() => setIsLoadingVoices(false));
     }
-  }, [elevenLabsApiKey, isSettingsOpen]);
+  }, [elevenLabsApiKey, isSettingsOpen, voiceSource]);
 
   // Save settings when they change
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) { // Added check back for safety
-      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId });
+      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI });
     }
-  }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId]);
+  }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -125,8 +152,11 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       if (recordedAudioUrl) {
         URL.revokeObjectURL(recordedAudioUrl);
       }
+      if (activeAudioUrl && activeAudioUrl !== recordedAudioUrl) { // Clean up ElevenLabs generated audio if different
+        URL.revokeObjectURL(activeAudioUrl);
+      }
     };
-  }, [recordedAudioUrl]);
+  }, [recordedAudioUrl, activeAudioUrl]);
 
   // Clean up playback on unmount
   useEffect(() => {
@@ -135,19 +165,129 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-      }
       setIsTtsPlaying(false);
       setIsAudioPlaying(false);
     };
   }, []);
+
+  // Sync active audio URL with recorded audio if system voice and recording exists
+  useEffect(() => {
+    if (recordedAudioUrl && voiceSource === 'system') {
+      setActiveAudioUrl(recordedAudioUrl);
+    }
+  }, [recordedAudioUrl, voiceSource]);
 
   // Flatten words for easy indexing
   const allWords: Word[] = React.useMemo(() => {
     if (!alignmentMap) return [];
     return alignmentMap.sentences.flatMap(s => s.words);
   }, [alignmentMap]);
+
+  // Initialize Chunks
+  useEffect(() => {
+    if (alignmentMap) {
+      const chunks = ChunkManager.createChunks(alignmentMap);
+      setAudioChunks(chunks);
+      setCurrentChunkIndex(-1);
+    } else {
+      setAudioChunks([]);
+      setCurrentChunkIndex(-1);
+    }
+  }, [alignmentMap]);
+
+  // Helper to update a single chunk in state
+  const updateChunk = (id: number, updates: Partial<AudioChunk>) => {
+    setAudioChunks(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+
+  // Play specific chunk
+  const playChunk = async (index: number) => {
+    if (index < 0 || index >= audioChunksRef.current.length) return;
+
+    const chunk = audioChunksRef.current[index];
+    setCurrentChunkIndex(index);
+
+    if (chunk.status === 'ready' && chunk.audioUrl) {
+      console.log(`[ChunkPlayback] Playing ready chunk ${index}`);
+      setActiveAudioUrl(chunk.audioUrl);
+      setCurrentAlignment(chunk.alignment);
+      setIsAudioPlaying(true);
+      setIsPaused(false);
+      return;
+    }
+
+    if (chunk.status === 'pending' || chunk.status === 'error') {
+      console.log(`[ChunkPlayback] Generating chunk ${index}`);
+      setIsGenerating(true);
+      updateChunk(chunk.id, { status: 'loading' });
+
+      try {
+        if (!elevenLabsApiKey || !selectedVoiceId) throw new Error("Missing API Key or Voice ID");
+
+        const { audioData, alignment } = await ElevenLabsClient.generateAudio(elevenLabsApiKey, selectedVoiceId, chunk.text);
+
+        updateChunk(chunk.id, {
+          status: 'ready',
+          audioUrl: audioData,
+          alignment: alignment
+        });
+
+        // If we are still "waiting" for this chunk to play (user didn't stop), play it
+        if (currentChunkIndex === index || currentChunkIndex === -1) { // Basic check
+          setActiveAudioUrl(audioData);
+          setCurrentAlignment(alignment);
+          setIsAudioPlaying(true);
+          setIsPaused(false);
+        }
+
+      } catch (err) {
+        console.error(`[ChunkPlayback] Failed chunk ${index}`, err);
+        const msg = typeof err === 'string' ? err : (err as Error).message;
+        updateChunk(chunk.id, { status: 'error', error: msg });
+        alert(`Failed to play segment: ${msg}`);
+        setIsAudioPlaying(false);
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+  };
+
+  // Just-in-Time Pre-fetch
+  const prefetchChunk = async (index: number) => {
+    if (index < 0 || index >= audioChunksRef.current.length) return;
+    const chunk = audioChunksRef.current[index];
+
+    if (chunk.status === 'pending') {
+      console.log(`[ChunkPlayback] Pre-fetching chunk ${index}`);
+      updateChunk(chunk.id, { status: 'loading' });
+
+      try {
+        if (!elevenLabsApiKey || !selectedVoiceId) return; // Silent fail on prefetch
+
+        const { audioData, alignment } = await ElevenLabsClient.generateAudio(elevenLabsApiKey, selectedVoiceId, chunk.text);
+
+        updateChunk(chunk.id, {
+          status: 'ready',
+          audioUrl: audioData,
+          alignment: alignment
+        });
+      } catch (err) {
+        console.error(`[ChunkPlayback] Prefetch failed for ${index}`, err);
+        // Reset to pending so we retry if we actually reach it? Or error?
+        // Let's set error so we don't spam.
+        updateChunk(chunk.id, { status: 'error', error: String(err) });
+      }
+    }
+  }
+
+  // Effect to handle auto-play when activeAudioUrl changes via ElevenLabs generation
+  // We need to be careful not to autoplay when just switching settings, but handleReadAloud sets triggers.
+  useEffect(() => {
+    if (activeAudioUrl && isAudioPlaying && !isPaused && audioRef.current && audioRef.current.paused) {
+      audioRef.current.play().catch(e => console.error("Auto-play failed:", e));
+    }
+  }, [activeAudioUrl, isAudioPlaying, isPaused]);
 
   // STT Result Listener
   useEffect(() => {
@@ -195,6 +335,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         }
         const url = URL.createObjectURL(audioBlob);
         setRecordedAudioUrl(url);
+        setActiveAudioUrl(url); // Set active immediately for playback
+        // Clear alignment when recording (no alignment for user recording yet)
+        setCurrentAlignment(null);
 
       } catch (error) {
         console.error('Error stopping recording:', error);
@@ -207,6 +350,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
           URL.revokeObjectURL(recordedAudioUrl);
           setRecordedAudioUrl(null);
         }
+        setActiveAudioUrl(null);
 
         const stream = await audioRecorder.current.start();
         if (stream) {
@@ -227,12 +371,15 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       audioRef.current.currentTime = 0;
     }
     window.speechSynthesis.cancel();
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
 
     setIsAudioPlaying(false);
     setIsTtsPlaying(false);
     setIsPaused(false);
+    setIsAudioPlaying(false);
+    setIsTtsPlaying(false);
+    setIsPaused(false);
     setCurrentWordIndex(-1);
+    setCurrentChunkIndex(-1);
   };
 
   const handlePause = () => {
@@ -243,7 +390,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       }
     } else if (isTtsPlaying) {
       window.speechSynthesis.pause();
-      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
       setIsPaused(true);
     }
   };
@@ -257,38 +403,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     } else if (isTtsPlaying) {
       window.speechSynthesis.resume();
       setIsPaused(false);
-      // Restart predictive highlighting from current word
-      if (currentWordIndex !== -1) {
-        scheduleNextHighlight(currentWordIndex);
-      }
     }
-  };
-
-  // Estimate duration: 50ms per character + 200ms base padding?
-  // Adjustable logic.
-  const estimateWordDuration = (word: Word | undefined): number => {
-    if (!word) return 300;
-    const base = 250;
-    const perChar = 30; // 5 chars = 150ms. Total ~400ms.
-    return base + (word.text.length * perChar);
-  };
-
-  const scheduleNextHighlight = (index: number) => {
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-    if (index >= allWords.length) return;
-
-    const duration = estimateWordDuration(allWords[index]);
-
-    highlightTimerRef.current = setTimeout(() => {
-      const nextIndex = index + 1;
-      if (nextIndex < allWords.length) {
-        setCurrentWordIndex(nextIndex);
-        scheduleNextHighlight(nextIndex);
-      } else {
-        // End of fallback
-        setCurrentWordIndex(-1);
-      }
-    }, duration);
   };
 
   const handleReadAloud = async () => {
@@ -300,51 +415,34 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     }
 
     // 1. Check for Configured Cloned Voice
-    if (selectedVoiceId && elevenLabsApiKey) {
-      await tracer.startActiveSpan('ReadingPane.handleReadAloud.elevenLabs', async (span) => {
-        try {
-          console.log('Generating/Playing via ElevenLabs');
-          const textToSpeak = alignmentMap?.sentences.map(s => s.words.map(w => w.text).join(' ')).join(' ') || text || '';
-          if (!textToSpeak) return;
-
-          setIsGenerating(true);
-          const audioDataUrl = await ElevenLabsClient.generateAudio(elevenLabsApiKey, selectedVoiceId, textToSpeak);
-
-          if (audioRef.current) {
-            audioRef.current.src = audioDataUrl;
-            audioRef.current.play();
-            setIsAudioPlaying(true);
-            setIsPaused(false);
-          }
-          span.end();
-        } catch (err) {
-          console.error('ElevenLabs generation failed:', err);
-          span.recordException(err as Error);
-          span.setStatus({ code: SpanStatusCode.ERROR });
-          alert('Failed to generate audio. falling back to system TTS.');
-          span.end();
-        } finally {
-          setIsGenerating(false);
-        }
-      });
+    if (voiceSource === 'elevenlabs' && selectedVoiceId && elevenLabsApiKey) {
+      console.log('Starting Chunked Playback via ElevenLabs');
+      // Reset
+      setIsAudioPlaying(true); // "Intent" to play
+      setCurrentChunkIndex(0);
+      // Wait for state update? No, playChunk uses ref eventually, but let's pass 0 directly.
+      playChunk(0);
       return;
     }
 
     // 2. Play Recorded Audio
-    if (recordedAudioUrl) {
-      if (audioRef.current) {
-        console.log('Playing recorded audio');
-        setIsAudioPlaying(true);
-        setIsPaused(false);
-        audioRef.current.play().catch(e => console.error("Error playing recording:", e));
-      } else {
-        console.warn('recordedAudioUrl exists but audioRef invalid');
-      }
+    if (recordedAudioUrl && voiceSource === 'system') {
+      // Ensure activeAudio is set
+      setActiveAudioUrl(recordedAudioUrl);
+      setIsAudioPlaying(true);
+      setIsPaused(false);
+      setCurrentAlignment(null);
+      // Playback handled by useEffect
       return;
     }
 
     // 3. FALLBACK: System TTS
-    console.log('[DEBUG] Starting TTS fallback.');
+    console.log('[DEBUG] Starting TTS fallback. Voice Source:', voiceSource);
+    // Make sure we clear active audio url so we don't double play or show audio controls incorrectly if we wanted to hide them?
+    // Actually we hide audio element if activeAudioUrl is null?
+    // No, we want to clear it if we are switching to TTS.
+    setActiveAudioUrl(null);
+
     const sentences = alignmentMap?.sentences || [];
 
     if (sentences.length === 0) {
@@ -354,14 +452,14 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
     // Ensure clean state
     window.speechSynthesis.cancel();
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
 
     // Prepare utterances
     const newUtterances: SpeechSynthesisUtterance[] = [];
     let globalWordOffset = 0;
 
-    // Prefer local voices for better reliability
-    const preferredVoice = voices.find(v => v.localService && v.lang.startsWith('en')) ||
+    // Prefer selected voice, then local English, then Google US
+    const preferredVoice = voices.find(v => v.voiceURI === systemVoiceURI) ||
+      voices.find(v => v.localService && v.lang.startsWith('en')) ||
       voices.find(v => v.name.includes('Google US English')) ||
       voices.find(v => v.lang.startsWith('en'));
 
@@ -381,12 +479,17 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       utterance.onboundary = (event) => {
         if (event.name === 'word') {
           const charIndex = event.charIndex;
+          // IMPORTANT: charIndex is relative to the UTTERANCE text, not the full document
+
+          // Use the map we built for this sentence
           const localWordIndex = currentParams.map[charIndex];
+
           if (localWordIndex !== undefined) {
             const absIndex = currentParams.offset + localWordIndex;
-            setCurrentWordIndex(absIndex);
-            // Sync the fallback timer
-            scheduleNextHighlight(absIndex);
+            // Ensure we don't jump backwards or to invalid indices
+            if (absIndex >= 0 && absIndex < allWords.length) {
+              setCurrentWordIndex(absIndex);
+            }
           }
         }
       };
@@ -396,9 +499,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
           console.log('[DEBUG] TTS Started');
           setIsTtsPlaying(true);
           setIsPaused(false);
-          // Kick off highlighting at 0 immediately
           setCurrentWordIndex(0);
-          scheduleNextHighlight(0);
         };
       }
 
@@ -408,14 +509,12 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
           setIsTtsPlaying(false);
           setIsPaused(false);
           setCurrentWordIndex(-1);
-          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
         };
         utterance.onerror = (e) => {
           if (e.error !== 'canceled' && e.error !== 'interrupted') {
             console.error('[DEBUG] TTS Error:', e.error);
           }
           setIsTtsPlaying(false);
-          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
         };
       }
 
@@ -497,7 +596,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
-                minWidth: '150px'
+                minWidth: '200px'
               }}>
                 <button onClick={toggleDyslexiaFont} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
                   {isDyslexiaFont ? '✓ Dyslexia Font' : 'Dyslexia Font'}
@@ -509,60 +608,162 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 <hr style={{ width: '100%', margin: '5px 0', border: '0', borderTop: '1px solid #eee' }} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ElevenLabs API Key</label>
-                  <input
-                    type="password"
-                    value={elevenLabsApiKey}
-                    onChange={(e) => setElevenLabsApiKey(e.target.value)}
-                    placeholder="sk-..."
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Voice Source</label>
+                  <select
+                    value={voiceSource}
+                    onChange={(e) => setVoiceSource(e.target.value as 'system' | 'elevenlabs')}
                     style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
+                  >
+                    <option value="system">System Voices</option>
+                    <option value="elevenlabs">ElevenLabs</option>
+                  </select>
                 </div>
 
-                {elevenLabsApiKey && (
+                {voiceSource === 'system' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Cloned Voice</label>
-                    {isLoadingVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
-                      <select
-                        value={selectedVoiceId}
-                        onChange={(e) => setSelectedVoiceId(e.target.value)}
-                        style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
-                      >
-                        <option value="">-- Select Voice --</option>
-                        {clonedVoices.map(v => (
-                          <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
-                        ))}
-                      </select>
-                    )}
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>System Voice</label>
+                    <select
+                      value={systemVoiceURI}
+                      onChange={(e) => setSystemVoiceURI(e.target.value)}
+                      style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                    >
+                      <option value="">-- Auto-Detect --</option>
+                      {voices.map(v => (
+                        <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
+                      ))}
+                    </select>
                   </div>
+                )}
+
+                {voiceSource === 'elevenlabs' && (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ElevenLabs API Key</label>
+                      <input
+                        type="password"
+                        value={elevenLabsApiKey}
+                        onChange={(e) => setElevenLabsApiKey(e.target.value)}
+                        placeholder="sk-..."
+                        style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                      />
+                    </div>
+
+                    {elevenLabsApiKey && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Cloned Voice</label>
+                        {isLoadingVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
+                          <>
+                            {voiceFetchError && (
+                              <div style={{ color: 'red', fontSize: '10px', marginBottom: '5px' }}>
+                                Error: {voiceFetchError}
+                              </div>
+                            )}
+                            <select
+                              value={selectedVoiceId}
+                              onChange={(e) => setSelectedVoiceId(e.target.value)}
+                              style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                            >
+                              <option value="">-- Select Voice --</option>
+                              {clonedVoices.map(v => (
+                                <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                              ))}
+                            </select>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
 
             <button onClick={onClose} className="readalong-close-btn">&times;</button>
-            {recordedAudioUrl && (
+            {activeAudioUrl && (
               <audio
                 ref={audioRef}
-                src={recordedAudioUrl}
+                src={activeAudioUrl}
                 style={{ display: 'none' }} // Hidden audio for logic control, or we could keep controls if we want default native UI
-                onPlay={() => { setIsAudioPlaying(true); setIsPaused(false); }}
+                onPlay={() => {
+                  setIsAudioPlaying(true);
+                  setIsPaused(false);
+
+                  // COST OPTIMIZATION: Just-in-Time Prefetch
+                  // When chunk N starts playing, ensure N+1 is fetching.
+                  if (currentChunkIndex !== -1) {
+                    prefetchChunk(currentChunkIndex + 1);
+                  }
+                }}
                 onPause={() => {
                   setIsPaused(true);
                 }}
                 onTimeUpdate={(e) => {
                   const currentTime = e.currentTarget.currentTime;
-                  const index = allWords.findIndex(w =>
-                    w.start !== undefined &&
-                    w.end !== undefined &&
-                    currentTime >= w.start &&
-                    currentTime <= w.end
-                  );
-                  if (index !== currentWordIndex) {
-                    setCurrentWordIndex(index);
+
+                  if (currentAlignment && currentAlignment.characters && currentAlignment.character_start_times_seconds) {
+                    // ELEVENLABS SYNC (Chunk-Relative)
+
+                    const charTimes = currentAlignment.character_start_times_seconds;
+                    let charIdx = -1;
+                    for (let i = 0; i < charTimes.length; i++) {
+                      if (charTimes[i] <= currentTime) {
+                        charIdx = i;
+                      } else {
+                        break;
+                      }
+                    }
+
+                    if (charIdx !== -1 && currentChunkIndex !== -1 && audioChunksRef.current[currentChunkIndex]) {
+                      const chunk = audioChunksRef.current[currentChunkIndex];
+                      // charIdx is index in chunk text.
+
+                      // We need to map this to the specific word in the chunk.
+                      // Iterate words in this chunk to find matched char count.
+                      // Start from chunk.startWordIndex.
+
+                      const chunkWords = chunk.sentences.flatMap(s => s.words);
+
+                      let charCounter = 0;
+                      let foundLocalIndex = -1;
+
+                      for (let i = 0; i < chunkWords.length; i++) {
+                        const wordLen = chunkWords[i].text.length;
+                        // Add 1 for space assumption
+                        if (charCounter + wordLen > charIdx) {
+                          foundLocalIndex = i;
+                          break;
+                        }
+                        charCounter += wordLen + 1;
+                      }
+
+                      if (foundLocalIndex !== -1) {
+                        const globalIndex = chunk.startWordIndex + foundLocalIndex;
+                        if (globalIndex !== currentWordIndex) {
+                          setCurrentWordIndex(globalIndex);
+                        }
+                      }
+                    }
+
+                  } else {
+                    // FALLBACK / RECORDED AUDIO (Time based on recorded timestamps if available)
+                    const index = allWords.findIndex(w =>
+                      w.start !== undefined &&
+                      w.end !== undefined &&
+                      currentTime >= w.start &&
+                      currentTime <= w.end
+                    );
+                    if (index !== currentWordIndex) {
+                      setCurrentWordIndex(index);
+                    }
                   }
                 }}
                 onEnded={() => {
-                  handleStop();
+                  // Play next chunk if available
+                  if (currentChunkIndex !== -1 && currentChunkIndex < audioChunks.length - 1) {
+                    console.log('[ChunkPlayback] Chunk ended, moving to next');
+                    playChunk(currentChunkIndex + 1);
+                  } else {
+                    handleStop();
+                  }
                 }}
               />
             )}

@@ -31,8 +31,44 @@ export class SttEngine {
     if (this.model) return;
 
     try {
+      // Caching logic
+      const cacheName = 'readalong-models-v1';
+      const cache = await caches.open(cacheName);
+      let response = await cache.match(this.modelUrl);
+      let modelSource: string | Blob = this.modelUrl;
+
+      if (!response) {
+        try {
+          console.log('Fetching model to cache...');
+          // If we are online, fetch and cache
+          if (navigator.onLine) {
+            response = await fetch(this.modelUrl);
+            if (response.ok) {
+              cache.put(this.modelUrl, response.clone());
+              console.log('Model cached.');
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to fetch/cache model:', e);
+        }
+      }
+
+      if (response) {
+        console.log('Loading model from cache...');
+        modelSource = await response.blob();
+      }
+
       // Create the model - this spawns a web worker
-      this.model = await createModel(this.modelUrl);
+      // createModel can accept a URL string or a Blob/File if passing a path isn't possible?
+      // vosk-browser createModel signature: (modelUrl: string, logLevel?: number) => Promise<Model>
+      // Wait, the types say `modelUrl: string`. 
+      // Does it support object URLs? Yes, usually.
+      
+      if (modelSource instanceof Blob) {
+        modelSource = URL.createObjectURL(modelSource);
+      }
+
+      this.model = await createModel(modelSource);
       
       // Create a recognizer
       this.recognizer = new this.model.KaldiRecognizer(this.sampleRate);

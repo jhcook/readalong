@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AlignmentMap, Sentence, Word } from './types';
 import { AudioRecorder } from './audio/AudioRecorder';
 import { SttEngine } from './audio/SttEngine';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -14,6 +15,7 @@ interface ReadingPaneProps {
 const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, isSimulating = false }) => {
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const isOnline = useNetworkStatus();
   
   // Recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -128,8 +130,14 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     <div className={`readalong-overlay ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
       <div className="readalong-container">
         <div className="readalong-header">
-          <h2>ReadAlong</h2>
+          <h2>
+            ReadAlong
+            {!isOnline && <span style={{ fontSize: '0.6em', marginLeft: '10px', background: '#666', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>OFFLINE</span>}
+          </h2>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button className="readalong-control-btn" disabled={!isOnline} title={!isOnline ? "Unavailable offline" : "Cloud Text-to-Speech"}>
+              Cloud TTS
+            </button>
             <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
               {isRecording ? 'Stop Recording' : 'Record Voice'}
             </button>

@@ -118,3 +118,16 @@
 .readalong-control-btn:hover {
   background: #dee2e6;
 }
+
+.readalong-control-btn.recording {
+  background-color: #ff4444;
+  color: white;
+  border-color: #cc0000;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}

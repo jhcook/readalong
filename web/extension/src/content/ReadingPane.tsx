@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AlignmentMap, Sentence, Word } from './types';
+import { AudioRecorder } from './audio/AudioRecorder';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -12,6 +13,10 @@ interface ReadingPaneProps {
 const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, isSimulating = false }) => {
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  
+  // Recording state
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const audioRecorder = useRef<AudioRecorder>(new AudioRecorder());
   
   // Accessibility states
   const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
@@ -69,12 +74,36 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     setIsPlaying(!isPlaying);
   };
 
+  const toggleRecording = async () => {
+    if (isRecording) {
+      try {
+        const audioBlob = await audioRecorder.current.stop();
+        setIsRecording(false);
+        console.log('Recording stopped, blob size:', audioBlob.size);
+        // Here we would eventually process the audioBlob
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+      }
+    } else {
+      try {
+        await audioRecorder.current.start();
+        setIsRecording(true);
+      } catch (error) {
+        console.error('Failed to start recording:', error);
+        alert('Could not start recording. Please allow microphone access.');
+      }
+    }
+  };
+
   return (
     <div className={`readalong-overlay ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
       <div className="readalong-container">
         <div className="readalong-header">
           <h2>ReadAlong</h2>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
+              {isRecording ? 'Stop Recording' : 'Record Voice'}
+            </button>
             <button onClick={toggleDyslexiaFont} className="readalong-control-btn">
               {isDyslexiaFont ? 'Standard Font' : 'Dyslexia Font'}
             </button>

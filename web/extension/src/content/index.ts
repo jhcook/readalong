@@ -32,7 +32,7 @@ function mountReadingPane(text: string, alignmentMap?: AlignmentMap) {
   shadowRoot.appendChild(container);
 
   const root = createRoot(container);
-  
+
   const handleClose = () => {
     root.unmount();
     if (rootElement) {
@@ -42,11 +42,10 @@ function mountReadingPane(text: string, alignmentMap?: AlignmentMap) {
     }
   };
 
-  root.render(React.createElement(ReadingPane, { 
-    text, 
-    alignmentMap, 
+  root.render(React.createElement(ReadingPane, {
+    text,
+    alignmentMap,
     onClose: handleClose,
-    isSimulating: true // Enable simulation for US1-3 verification
   }));
 }
 
@@ -62,18 +61,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = text;
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
-        
+
         // Store alignment map (AC4) - for now just in memory/processed
         const alignmentMap = tokenizeText(plainText);
-        
+
         mountReadingPane(text, alignmentMap);
         span.setStatus({ code: SpanStatusCode.OK });
       } else {
         const errorMsg = 'Could not extract text from this page.';
         alert(errorMsg);
-        span.setStatus({ 
+        span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: errorMsg 
+          message: errorMsg
         });
       }
     } catch (error) {

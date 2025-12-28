@@ -7,16 +7,23 @@ import { trace, Tracer } from '@opentelemetry/api';
 
 const serviceName = 'readalong-extension';
 
+const ENABLE_TRACING = false; // Set to true if you have a local OTel collector running
+
 export function setupTracing(): Tracer {
-  const exporter = new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces',
-  });
+  const spanProcessors = [];
+
+  if (ENABLE_TRACING) {
+    const exporter = new OTLPTraceExporter({
+      url: 'https://localhost:4318/v1/traces',
+    });
+    spanProcessors.push(new BatchSpanProcessor(exporter));
+  }
 
   const provider = new WebTracerProvider({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName,
     }),
-    spanProcessors: [new BatchSpanProcessor(exporter)],
+    spanProcessors: spanProcessors,
   });
 
   provider.register();

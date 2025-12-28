@@ -1,3 +1,7 @@
+/**
+ * Handles microphone access and recording using the MediaRecorder API.
+ * Provides a stream for real-time processing and a Blob for playback.
+ */
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
@@ -48,7 +52,7 @@ export class AudioRecorder {
       };
 
       this.mediaRecorder.stop();
-      
+
       // Stop all tracks to release the microphone
       if (this.stream) {
         this.stream.getTracks().forEach(track => track.stop());

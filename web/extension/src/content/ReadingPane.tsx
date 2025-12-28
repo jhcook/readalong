@@ -9,21 +9,64 @@ interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
   text?: string; // Fallback for backward compatibility or error states
   onClose: () => void;
-  // Simulation props for US1-3 verification
-  isSimulating?: boolean;
 }
 
-const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, isSimulating = false }) => {
+// Helper to reconstruct text and map character offsets to word indices
+const buildTextAndMap = (words: Word[]) => {
+  let text = '';
+  const map: number[] = [];
+
+  words.forEach((word, index) => {
+    // Current length is the start char index of this word
+    const start = text.length;
+    text += word.text + ' ';
+    // Map every character in this word (plus the trailing space) to this word index
+    for (let i = start; i < text.length; i++) {
+      map[i] = index;
+    }
+  });
+
+  return { text: text.trim(), map };
+};
+
+const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }) => {
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isTtsPlaying, setIsTtsPlaying] = useState<boolean>(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const isOnline = useNetworkStatus();
-  
+
+  // TTS State
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Predictive Highlighting Ref
+  const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load voices
+  useEffect(() => {
+    const updateVoices = () => {
+      setVoices(window.speechSynthesis.getVoices());
+    };
+
+    updateVoices();
+    window.speechSynthesis.onvoiceschanged = updateVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   // Recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const audioRecorder = useRef<AudioRecorder>(new AudioRecorder());
   const sttEngine = useRef<SttEngine>(new SttEngine());
   const aligner = useRef<Aligner>(new Aligner());
-  
+
   // Accessibility states
   const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
@@ -54,6 +97,30 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     }
   }, [isDyslexiaFont, isHighContrast]);
 
+  // Clean up object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (recordedAudioUrl) {
+        URL.revokeObjectURL(recordedAudioUrl);
+      }
+    };
+  }, [recordedAudioUrl]);
+
+  // Clean up playback on unmount
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+      setIsTtsPlaying(false);
+      setIsAudioPlaying(false);
+    };
+  }, []);
+
   // Flatten words for easy indexing
   const allWords: Word[] = React.useMemo(() => {
     if (!alignmentMap) return [];
@@ -63,18 +130,11 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
   // STT Result Listener
   useEffect(() => {
     const handleSttResult = (event: CustomEvent) => {
-      // event.detail is the Vosk result object
-      // { result: Array<{conf, end, start, word}>, text: string } OR { partial: string }
-      
       const data = event.detail;
       if (data && data.result && Array.isArray(data.result)) {
-        // We have recognized words
         const recognizedWords = data.result as RecognizedWord[];
-        
-        // Run alignment
-        // We pass the full reference list (allWords) and the new recognized words
         const matchedIndex = aligner.current.align(allWords, recognizedWords);
-        
+
         if (matchedIndex !== -1) {
           setCurrentWordIndex(matchedIndex);
         }
@@ -82,33 +142,15 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     };
 
     window.addEventListener('stt-result' as any, handleSttResult);
-    // Partial results usually don't have word timestamps in standard Vosk usage unless configured
-    // For now we rely on 'result' (final) which definitely has them if setWords(true) is used.
-    // If we want faster feedback, we might need to parse partials differently or use a different Aligner strategy.
-    
     return () => {
       window.removeEventListener('stt-result' as any, handleSttResult);
     };
   }, [allWords]);
 
-  // Cleanup STT on unmount
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isSimulating && isPlaying && allWords.length > 0) {
-      interval = setInterval(() => {
-        setCurrentWordIndex(prev => {
-          const next = prev + 1;
-          if (next >= allWords.length) {
-            setIsPlaying(false);
-            return -1; // Reset or stop
-          }
-          return next;
-        });
-      }, 300); // 300ms per word simulation
-    }
-    return () => clearInterval(interval);
-  }, [isSimulating, isPlaying, allWords.length]);
+  const toggleSettings = () => {
+    setIsSettingsOpen(!isSettingsOpen);
+  };
 
   const toggleHighContrast = () => {
     setIsHighContrast(!isHighContrast);
@@ -118,10 +160,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     setIsDyslexiaFont(!isDyslexiaFont);
   };
 
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying);
-  };
-
   const toggleRecording = async () => {
     if (isRecording) {
       try {
@@ -129,11 +167,25 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
         sttEngine.current.stop();
         setIsRecording(false);
         console.log('Recording stopped, blob size:', audioBlob.size);
+
+        if (recordedAudioUrl) {
+          URL.revokeObjectURL(recordedAudioUrl);
+        }
+        const url = URL.createObjectURL(audioBlob);
+        setRecordedAudioUrl(url);
+
       } catch (error) {
         console.error('Error stopping recording:', error);
       }
     } else {
       try {
+        handleStop();
+
+        if (recordedAudioUrl) {
+          URL.revokeObjectURL(recordedAudioUrl);
+          setRecordedAudioUrl(null);
+        }
+
         const stream = await audioRecorder.current.start();
         if (stream) {
           aligner.current.reset(); // Reset alignment state
@@ -147,6 +199,189 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     }
   };
 
+  const handleStop = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    window.speechSynthesis.cancel();
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+
+    setIsAudioPlaying(false);
+    setIsTtsPlaying(false);
+    setIsPaused(false);
+    setCurrentWordIndex(-1);
+  };
+
+  const handlePause = () => {
+    if (isAudioPlaying) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPaused(true);
+      }
+    } else if (isTtsPlaying) {
+      window.speechSynthesis.pause();
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      setIsPaused(true);
+    }
+  };
+
+  const handleResume = () => {
+    if (isAudioPlaying) {
+      if (audioRef.current) {
+        audioRef.current.play();
+        setIsPaused(false);
+      }
+    } else if (isTtsPlaying) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+      // Restart predictive highlighting from current word
+      if (currentWordIndex !== -1) {
+        scheduleNextHighlight(currentWordIndex);
+      }
+    }
+  };
+
+  // Estimate duration: 50ms per character + 200ms base padding?
+  // Adjustable logic.
+  const estimateWordDuration = (word: Word | undefined): number => {
+    if (!word) return 300;
+    const base = 250;
+    const perChar = 30; // 5 chars = 150ms. Total ~400ms.
+    return base + (word.text.length * perChar);
+  };
+
+  const scheduleNextHighlight = (index: number) => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    if (index >= allWords.length) return;
+
+    const duration = estimateWordDuration(allWords[index]);
+
+    highlightTimerRef.current = setTimeout(() => {
+      const nextIndex = index + 1;
+      if (nextIndex < allWords.length) {
+        setCurrentWordIndex(nextIndex);
+        scheduleNextHighlight(nextIndex);
+      } else {
+        // End of fallback
+        setCurrentWordIndex(-1);
+      }
+    }, duration);
+  };
+
+  const handleReadAloud = async () => {
+    console.log('handleReadAloud called. State:', { isAudioPlaying, isTtsPlaying, isRecording, recordedAudioUrl: !!recordedAudioUrl });
+
+    if (isRecording) {
+      await toggleRecording();
+      return;
+    }
+
+    if (recordedAudioUrl) {
+      if (audioRef.current) {
+        console.log('Playing recorded audio');
+        setIsAudioPlaying(true);
+        setIsPaused(false);
+        audioRef.current.play().catch(e => console.error("Error playing recording:", e));
+      } else {
+        console.warn('recordedAudioUrl exists but audioRef invalid');
+      }
+      return;
+    }
+
+    // FALLBACK: System TTS
+    console.log('[DEBUG] Starting TTS fallback.');
+    const sentences = alignmentMap?.sentences || [];
+
+    if (sentences.length === 0) {
+      console.warn('[DEBUG] No sentences to speak');
+      return;
+    }
+
+    // Ensure clean state
+    window.speechSynthesis.cancel();
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+
+    // Prepare utterances
+    const newUtterances: SpeechSynthesisUtterance[] = [];
+    let globalWordOffset = 0;
+
+    // Prefer local voices for better reliability
+    const preferredVoice = voices.find(v => v.localService && v.lang.startsWith('en')) ||
+      voices.find(v => v.name.includes('Google US English')) ||
+      voices.find(v => v.lang.startsWith('en'));
+
+    sentences.forEach((sentence, sIndex) => {
+      if (sentence.words.length === 0) return;
+
+      const { text, map } = buildTextAndMap(sentence.words);
+      const utterance = new SpeechSynthesisUtterance(text);
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      const currentSentenceOffset = globalWordOffset;
+      const currentParams = { map, offset: currentSentenceOffset };
+
+      utterance.onboundary = (event) => {
+        if (event.name === 'word') {
+          const charIndex = event.charIndex;
+          const localWordIndex = currentParams.map[charIndex];
+          if (localWordIndex !== undefined) {
+            const absIndex = currentParams.offset + localWordIndex;
+            setCurrentWordIndex(absIndex);
+            // Sync the fallback timer
+            scheduleNextHighlight(absIndex);
+          }
+        }
+      };
+
+      if (sIndex === 0) {
+        utterance.onstart = () => {
+          console.log('[DEBUG] TTS Started');
+          setIsTtsPlaying(true);
+          setIsPaused(false);
+          // Kick off highlighting at 0 immediately
+          setCurrentWordIndex(0);
+          scheduleNextHighlight(0);
+        };
+      }
+
+      if (sIndex === sentences.length - 1) {
+        utterance.onend = () => {
+          console.log('[DEBUG] TTS Ended');
+          setIsTtsPlaying(false);
+          setIsPaused(false);
+          setCurrentWordIndex(-1);
+          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+        };
+        utterance.onerror = (e) => {
+          if (e.error !== 'canceled' && e.error !== 'interrupted') {
+            console.error('[DEBUG] TTS Error:', e.error);
+          }
+          setIsTtsPlaying(false);
+          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+        };
+      }
+
+      newUtterances.push(utterance);
+      globalWordOffset += sentence.words.length;
+    });
+
+    utterancesRef.current = newUtterances;
+
+    if (newUtterances.length > 0) {
+      newUtterances.forEach(u => window.speechSynthesis.speak(u));
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      setIsTtsPlaying(true);
+    }
+  };
+
+  const showPlaybackControls = isTtsPlaying || isAudioPlaying;
+
   return (
     <div className={`readalong-overlay ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
       <div className="readalong-container">
@@ -155,25 +390,96 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
             ReadAlong
             {!isOnline && <span style={{ fontSize: '0.6em', marginLeft: '10px', background: '#666', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>OFFLINE</span>}
           </h2>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button className="readalong-control-btn" disabled={!isOnline} title={!isOnline ? "Unavailable offline" : "Cloud Text-to-Speech"}>
-              Cloud TTS
-            </button>
-            <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
-              {isRecording ? 'Stop Recording' : 'Record Voice'}
-            </button>
-            <button onClick={toggleDyslexiaFont} className="readalong-control-btn">
-              {isDyslexiaFont ? 'Standard Font' : 'Dyslexia Font'}
-            </button>
-            <button onClick={toggleHighContrast} className="readalong-control-btn">
-              {isHighContrast ? 'Normal Contrast' : 'High Contrast'}
-            </button>
-            {alignmentMap && (
-              <button onClick={togglePlay} className="readalong-control-btn">
-                {isPlaying ? 'Pause' : 'Play Simulation'}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', position: 'relative' }}>
+            {allWords.length > 0 && !showPlaybackControls && (
+              <button
+                className="readalong-control-btn"
+                onClick={handleReadAloud}
+                title="Read Aloud"
+              >
+                Read Aloud
               </button>
             )}
+
+            {showPlaybackControls && (
+              <>
+                {!isPaused ? (
+                  <button className="readalong-control-btn" onClick={handlePause} title="Pause">
+                    Pause
+                  </button>
+                ) : (
+                  <button className="readalong-control-btn" onClick={handleResume} title="Resume">
+                    Resume
+                  </button>
+                )}
+                <button className="readalong-control-btn active" onClick={handleStop} title="Stop">
+                  Stop
+                </button>
+              </>
+            )}
+
+            <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
+              {isRecording ? 'Stop' : 'Record'}
+            </button>
+
+            {/* Settings Toggle */}
+            <button onClick={toggleSettings} className="readalong-control-btn" title="Settings">
+              ⚙️
+            </button>
+
+            {/* Settings Menu Dropdown */}
+            {isSettingsOpen && (
+              <div className="readalong-settings-menu" style={{
+                position: 'absolute',
+                top: '100%',
+                right: '40px',
+                background: '#fff',
+                border: '1px solid #ccc',
+                borderRadius: '8px',
+                padding: '10px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                minWidth: '150px'
+              }}>
+                <button onClick={toggleDyslexiaFont} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
+                  {isDyslexiaFont ? '✓ Dyslexia Font' : 'Dyslexia Font'}
+                </button>
+                <button onClick={toggleHighContrast} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
+                  {isHighContrast ? '✓ High Contrast' : 'High Contrast'}
+                </button>
+              </div>
+            )}
+
             <button onClick={onClose} className="readalong-close-btn">&times;</button>
+            {recordedAudioUrl && (
+              <audio
+                ref={audioRef}
+                src={recordedAudioUrl}
+                style={{ display: 'none' }} // Hidden audio for logic control, or we could keep controls if we want default native UI
+                onPlay={() => { setIsAudioPlaying(true); setIsPaused(false); }}
+                onPause={() => {
+                  setIsPaused(true);
+                }}
+                onTimeUpdate={(e) => {
+                  const currentTime = e.currentTarget.currentTime;
+                  const index = allWords.findIndex(w =>
+                    w.start !== undefined &&
+                    w.end !== undefined &&
+                    currentTime >= w.start &&
+                    currentTime <= w.end
+                  );
+                  if (index !== currentWordIndex) {
+                    setCurrentWordIndex(index);
+                  }
+                }}
+                onEnded={() => {
+                  handleStop();
+                }}
+              />
+            )}
           </div>
         </div>
         <div className="readalong-content">
@@ -181,31 +487,12 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
             alignmentMap.sentences.map((sentence, sIdx) => (
               <p key={sIdx}>
                 {sentence.words.map((word, wIdx) => {
-                  // Determine global index if needed, or just match by reference if we had IDs
-                  // Here we can use the 'index' property we added to Word interface in US1-2?
-                  // Or just use the flattened list logic. 
-                  // Let's assume we want to match against the flattened index we are simulating.
-                  // We need to know the 'global' index of this word.
-                  // A simple way is to calculate it or store it.
-                  // For now, let's look it up or trust the structure.
-                  // US1-2 `Word` has `index` which is relative to sentence? 
-                  // Let's re-read types.ts. Word.index is "Order in the sentence".
-                  // So we need a global index. 
-                  
-                  // Let's compute global index on the fly or pre-compute.
-                  // Pre-computing is better for render performance.
-                  // But for this prototype, let's find the word in allWords to check equality? No, too slow.
-                  // Let's rely on the fact that we iterate sequentially.
-                  // Actually, let's just use a simple counter variable outside the map? No, impure.
-                  
-                  // Better: let's verify if `word` is the active one.
-                  // We can't easily know the global index here without extra work.
-                  // Let's temporarily check if this word is the one at allWords[currentWordIndex].
+                  // Check if this word is the currently spoken one
                   const isActive = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
 
                   return (
-                    <span 
-                      key={wIdx} 
+                    <span
+                      key={wIdx}
                       className={`readalong-word ${isActive ? 'active' : ''}`}
                     >
                       {word.text}{' '}

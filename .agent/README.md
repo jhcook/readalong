@@ -17,8 +17,9 @@ We follow a strict **Story-Driven Development** workflow:
 1.  **Draft a Story**: `agent new-story` (Prompts for logical category: INFRA, WEB, MOBILE, BACKEND).
 2.  **Plan (Optional)**: `agent new-plan` for complex Epics breaking down into multiple stories.
 3.  **Implement**: Write code.
-4.  **Preflight**: `agent preflight --story WEB-123` (Must pass before commit).
-5.  **Commit**: `agent commit --story WEB-123` (Enforces commit message standards).
+4.  **Document**: Update existing or create new documentation in accordance with the new code.
+5.  **Preflight**: `agent preflight --story WEB-123` (Must pass before commit).
+6.  **Commit**: `agent commit --story WEB-123` (Enforces commit message standards).
 
 ### 3. Directory Structure
 

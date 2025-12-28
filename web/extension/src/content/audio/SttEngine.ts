@@ -45,13 +45,12 @@ export class SttEngine {
 
         if (!response) {
           try {
-            console.log('Fetching model to cache...');
             // If we are online, fetch and cache
             if (navigator.onLine) {
               response = await fetch(this.modelUrl);
               if (response.ok) {
                 cache.put(this.modelUrl, response.clone());
-                console.log('Model cached.');
+                cache.put(this.modelUrl, response.clone());
               }
             }
           } catch (e) {
@@ -60,7 +59,6 @@ export class SttEngine {
         }
 
         if (response) {
-          console.log('Loading model from cache...');
           modelSource = await response.blob();
         }
 
@@ -76,24 +74,8 @@ export class SttEngine {
 
         this.model = await createModel(modelSource);
 
-        // Create a recognizer
-        this.recognizer = new this.model.KaldiRecognizer(this.sampleRate);
-        this.recognizer.setWords(true); // Enable word timestamps
+        // Recognizer creation is now deferred to start() to allow dynamic sample rate usage
 
-        this.recognizer.on("result", (message: any) => {
-          console.log(`STT Result: ${message.result.text}`, message.result);
-          // Dispatch custom event or callback
-          const event = new CustomEvent('stt-result', { detail: message.result });
-          window.dispatchEvent(event);
-        });
-
-        this.recognizer.on("partialresult", (message: any) => {
-          // console.log(`STT Partial: ${message.result.partial}`);
-          const event = new CustomEvent('stt-partial', { detail: message.result });
-          window.dispatchEvent(event);
-        });
-
-        console.log('SttEngine initialized');
       } catch (error) {
         console.error('Failed to initialize SttEngine:', error);
         span.recordException(error as Error);
@@ -117,13 +99,38 @@ export class SttEngine {
         await this.audioContext.audioWorklet.addModule(chrome.runtime.getURL('audio-processor.js'));
         this.source = this.audioContext.createMediaStreamSource(stream);
 
+        // Initialize recognizer with the correct sample rate from the AudioContext
+        if (this.recognizer) {
+          this.recognizer.remove();
+        }
+        this.recognizer = new this.model!.KaldiRecognizer(this.audioContext.sampleRate);
+        this.recognizer.setWords(true);
+        this.recognizer.on("result", (message: any) => {
+          const event = new CustomEvent('stt-result', { detail: message.result });
+          window.dispatchEvent(event);
+        });
+        this.recognizer.on("partialresult", (message: any) => {
+          const event = new CustomEvent('stt-partial', { detail: message.result });
+          window.dispatchEvent(event);
+        });
+
         this.workletNode = new AudioWorkletNode(this.audioContext, 'stt-processor');
 
         this.workletNode.port.onmessage = (event) => {
           try {
-            if (this.recognizer) {
-              // The buffer sent from the worklet is a Float32Array
-              this.recognizer.acceptWaveform(event.data);
+            if (this.recognizer && this.audioContext) {
+              const float32Data = event.data as unknown as Float32Array;
+
+              // Use a real AudioBuffer to ensure compatibility with vosk-browser's checks
+              // This resolves "TypeError: U.getChannelData is not a function"
+              const audioBuffer = this.audioContext.createBuffer(
+                1,
+                float32Data.length,
+                this.audioContext.sampleRate
+              );
+              audioBuffer.copyToChannel(float32Data as any, 0);
+
+              this.recognizer.acceptWaveform(audioBuffer);
             }
           } catch (error) {
             console.error('acceptWaveform failed', error);

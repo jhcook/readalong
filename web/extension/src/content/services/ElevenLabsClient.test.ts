@@ -88,7 +88,10 @@ describe('ElevenLabsClient', () => {
             }) as any);
 
             const result = await ElevenLabsClient.generateAudio('key', 'vid', 'hello');
-            expect(result).toEqual(audioData);
+            expect(result).toEqual({
+                audioData: audioData,
+                alignment: undefined
+            });
         });
     });
 });

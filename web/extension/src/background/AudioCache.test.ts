@@ -107,27 +107,49 @@ describe('AudioCache', () => {
         expect(result).toBeNull();
     });
 
+    // Mock Blob and FileReader for this test to avoid JSDOM issues
+    class MockBlob {
+        content: string[];
+        options: any;
+        size: number;
+        type: string;
+
+        constructor(content: string[], options: any) {
+            this.content = content;
+            this.options = options;
+            this.size = content.join('').length;
+            this.type = options.type;
+        }
+        text() { return Promise.resolve(this.content.join('')); }
+    }
+
     it('saves and retrieves a blob', async () => {
         const id = 'test-id';
-        const content = new Blob(['audio data'], { type: 'audio/mpeg' });
+        const content = new MockBlob(['audio data'], { type: 'audio/mpeg' }) as any as Blob;
+
+        // Sanity check
+        expect((content as any).size).toBe(10);
 
         await cache.saveAudio(id, content);
-        const result = await cache.getAudio(id);
+        const result: any = await cache.getAudio(id);
+
+        console.log('Result keys:', Object.keys(result || {}));
 
         expect(result).not.toBeNull();
-        expect(result).toBeInstanceOf(Blob);
+        expect(result.blob.size).toBe(10); // 'audio data'.length
+        expect(result.blob.type).toBe('audio/mpeg');
 
-        const text = await readBlob(result!);
+        const text = await result.blob.text();
         expect(text).toBe('audio data');
     });
 
     it('updates existing key', async () => {
         const id = 'overwrite-id';
-        await cache.saveAudio(id, new Blob(['first'], { type: 'text/plain' }));
-        await cache.saveAudio(id, new Blob(['second'], { type: 'text/plain' }));
+        await cache.saveAudio(id, new MockBlob(['first'], { type: 'text/plain' }) as any as Blob);
+        await cache.saveAudio(id, new MockBlob(['second'], { type: 'text/plain' }) as any as Blob);
 
-        const result = await cache.getAudio(id);
-        const text = await readBlob(result!);
+        const result: any = await cache.getAudio(id);
+        const text = await result.blob.text();
         expect(text).toBe('second');
     });
 });

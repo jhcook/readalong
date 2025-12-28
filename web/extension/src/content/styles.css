@@ -63,3 +63,15 @@
 .readalong-content p {
   margin-bottom: 1.5rem;
 }
+
+.readalong-word {
+  display: inline-block;
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: background-color 0.1s ease;
+}
+
+.readalong-word.active {
+  background-color: #ffeb3b; /* High contrast yellow */
+  color: #000;
+}

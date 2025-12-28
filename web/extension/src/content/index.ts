@@ -8,10 +8,12 @@ import { tokenizeText } from './tokenizer';
 
 const tracer = setupTracing();
 
+import { AlignmentMap } from './types';
+
 let rootElement: HTMLElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
 
-function mountReadingPane(text: string) {
+function mountReadingPane(text: string, alignmentMap?: AlignmentMap) {
   if (rootElement) return;
 
   rootElement = document.createElement('div');
@@ -40,7 +42,12 @@ function mountReadingPane(text: string) {
     }
   };
 
-  root.render(React.createElement(ReadingPane, { text, onClose: handleClose }));
+  root.render(React.createElement(ReadingPane, { 
+    text, 
+    alignmentMap, 
+    onClose: handleClose,
+    isSimulating: true // Enable simulation for US1-3 verification
+  }));
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -59,7 +66,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Store alignment map (AC4) - for now just in memory/processed
         const alignmentMap = tokenizeText(plainText);
         
-        mountReadingPane(text);
+        mountReadingPane(text, alignmentMap);
         span.setStatus({ code: SpanStatusCode.OK });
       } else {
         const errorMsg = 'Could not extract text from this page.';

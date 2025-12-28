@@ -4,6 +4,8 @@ import { AudioRecorder } from './audio/AudioRecorder';
 import { SttEngine } from './audio/SttEngine';
 import { Aligner, RecognizedWord } from './alignment/Aligner';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { ElevenLabsClient, Voice } from './services/ElevenLabsClient';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -42,6 +44,13 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ElevenLabs State
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState<string>('');
+  const [clonedVoices, setClonedVoices] = useState<Voice[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
+  const [isLoadingVoices, setIsLoadingVoices] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   // Predictive Highlighting Ref
   const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,20 +91,33 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast'], (result: any) => {
+      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId'], (result: any) => {
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
+        if (result.elevenLabsApiKey) setElevenLabsApiKey(result.elevenLabsApiKey);
+        if (result.selectedVoiceId) setSelectedVoiceId(result.selectedVoiceId);
       });
     }
   }, []);
 
+  // Fetch voices when API key is set
+  useEffect(() => {
+    if (elevenLabsApiKey && isSettingsOpen) {
+      setIsLoadingVoices(true);
+      ElevenLabsClient.getVoices(elevenLabsApiKey)
+        .then(voices => setClonedVoices(voices))
+        .catch(err => console.error("Failed to load voices", err))
+        .finally(() => setIsLoadingVoices(false));
+    }
+  }, [elevenLabsApiKey, isSettingsOpen]);
+
   // Save settings when they change
   useEffect(() => {
     const chromeApi = getChrome();
-    if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast });
+    if (chromeApi && chromeApi.storage && chromeApi.storage.local) { // Added check back for safety
+      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId });
     }
-  }, [isDyslexiaFont, isHighContrast]);
+  }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -270,13 +292,45 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   };
 
   const handleReadAloud = async () => {
-    console.log('handleReadAloud called. State:', { isAudioPlaying, isTtsPlaying, isRecording, recordedAudioUrl: !!recordedAudioUrl });
+    const tracer = trace.getTracer('readalong-extension');
 
     if (isRecording) {
       await toggleRecording();
       return;
     }
 
+    // 1. Check for Configured Cloned Voice
+    if (selectedVoiceId && elevenLabsApiKey) {
+      await tracer.startActiveSpan('ReadingPane.handleReadAloud.elevenLabs', async (span) => {
+        try {
+          console.log('Generating/Playing via ElevenLabs');
+          const textToSpeak = alignmentMap?.sentences.map(s => s.words.map(w => w.text).join(' ')).join(' ') || text || '';
+          if (!textToSpeak) return;
+
+          setIsGenerating(true);
+          const audioDataUrl = await ElevenLabsClient.generateAudio(elevenLabsApiKey, selectedVoiceId, textToSpeak);
+
+          if (audioRef.current) {
+            audioRef.current.src = audioDataUrl;
+            audioRef.current.play();
+            setIsAudioPlaying(true);
+            setIsPaused(false);
+          }
+          span.end();
+        } catch (err) {
+          console.error('ElevenLabs generation failed:', err);
+          span.recordException(err as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR });
+          alert('Failed to generate audio. falling back to system TTS.');
+          span.end();
+        } finally {
+          setIsGenerating(false);
+        }
+      });
+      return;
+    }
+
+    // 2. Play Recorded Audio
     if (recordedAudioUrl) {
       if (audioRef.current) {
         console.log('Playing recorded audio');
@@ -289,7 +343,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       return;
     }
 
-    // FALLBACK: System TTS
+    // 3. FALLBACK: System TTS
     console.log('[DEBUG] Starting TTS fallback.');
     const sentences = alignmentMap?.sentences || [];
 
@@ -403,6 +457,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
             {showPlaybackControls && (
               <>
+                {isGenerating && <span style={{ fontSize: '12px', marginRight: '5px' }}>Generating...</span>}
                 {!isPaused ? (
                   <button className="readalong-control-btn" onClick={handlePause} title="Pause">
                     Pause
@@ -450,6 +505,37 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 <button onClick={toggleHighContrast} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
                   {isHighContrast ? '✓ High Contrast' : 'High Contrast'}
                 </button>
+
+                <hr style={{ width: '100%', margin: '5px 0', border: '0', borderTop: '1px solid #eee' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ElevenLabs API Key</label>
+                  <input
+                    type="password"
+                    value={elevenLabsApiKey}
+                    onChange={(e) => setElevenLabsApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
+
+                {elevenLabsApiKey && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Cloned Voice</label>
+                    {isLoadingVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
+                      <select
+                        value={selectedVoiceId}
+                        onChange={(e) => setSelectedVoiceId(e.target.value)}
+                        style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                      >
+                        <option value="">-- Select Voice --</option>
+                        {clonedVoices.map(v => (
+                          <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

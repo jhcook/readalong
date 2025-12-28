@@ -28,6 +28,9 @@ Object.defineProperty(window, 'speechSynthesis', {
   value: {
     getVoices: mockGetVoices,
     onvoiceschanged: null,
+    cancel: jest.fn(),
+    pause: jest.fn(),
+    resume: jest.fn(),
   },
   writable: true,
 });

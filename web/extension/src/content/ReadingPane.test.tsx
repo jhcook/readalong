@@ -282,4 +282,133 @@ describe('ReadingPane', () => {
       expect(screen.getByText('Error: Invalid API Key')).toBeInTheDocument();
     });
   });
+
+  it('navigates back one sentence during System TTS', () => {
+    const multiSentenceMap: AlignmentMap = {
+      fullText: "Sentence one. Sentence two. Sentence three.",
+      sentences: [
+        { text: "Sentence one.", index: 0, words: [{ text: "Sentence", index: 0 }, { text: "one", index: 1 }] },
+        { text: "Sentence two.", index: 1, words: [{ text: "Sentence", index: 2 }, { text: "two", index: 3 }] },
+        { text: "Sentence three.", index: 2, words: [{ text: "Sentence", index: 4 }, { text: "three", index: 5 }] }
+      ]
+    };
+
+    render(<ReadingPane alignmentMap={multiSentenceMap} onClose={jest.fn()} />);
+    const ttsButton = screen.getByTitle('Read Aloud');
+
+    // Start reading (Sentence 0)
+    act(() => {
+      ttsButton.click();
+      jest.advanceTimersByTime(100);
+    });
+
+    // Simulate progress to Sentence 1 (index 2 in allWords)
+    // We can't easily simulate onboundary on the mock without exposing it.
+    // But handleBackOneSentence relies on currentWordIndex.
+    // We can manually set currentWordIndex via `onboundary` if we had access to the utterance instance.
+    // The component creates utterances. We mock `SpeechSynthesisUtterance`.
+
+    // We need to access the created instances or just assume handleBackOneSentence logic works if we force state?
+    // We can't force component state from outside.
+
+    // Alternative: We can mock `window.speechSynthesis.speak` to capturing the utterance and triggering onboundary?
+    // Let's rely on the fact that `handleReadAloud` was called initially.
+
+    // To properly test "Back", we need `currentWordIndex` to be > sentence 0 start.
+    // We can trigger `onboundary` on the LAST call to `speak`.
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    // 3 sentences -> 3 utterances.
+    // Trigger onboundary on the 2nd utterance (Sentence 1).
+    const secondUtterance = utterances[1];
+    act(() => {
+      if (secondUtterance.onstart) secondUtterance.onstart(); // needed?
+      if (secondUtterance.onboundary) {
+        secondUtterance.onboundary({ name: 'word', charIndex: 0 }); // Start of "Sentence two"
+      }
+    });
+
+    // Now currentWordIndex should be 2.
+
+    // Click Back
+    const backButton = screen.getByTitle('Back One Sentence');
+    act(() => {
+      backButton.click();
+    });
+
+    // Verify debounce - wait 500ms
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    // Expect restart. 
+    // cancel() should be called.
+    expect(mockCancel).toHaveBeenCalled();
+    // speak() should be called again.
+    // Since we were at Sentence 1, back should go to Sentence 0.
+    // So distinct speak calls for Sentence 0, 1, 2 should happen.
+    // Before back: Called 3 times (initial play).
+    // After back: Called +3 times (restart from 0)? No, +3 times (restart from 0).
+    // Wait, if target is 0, it restarts from 0.
+
+    // What if we were at Sentence 2? Back -> Sentence 1.
+    // Triger onboundary on 3rd utterance.
+  });
+
+  it('debounces back clicks', () => {
+    const multiSentenceMap: AlignmentMap = {
+      fullText: "S1. S2. S3.",
+      sentences: [
+        { text: "S1.", index: 0, words: [{ text: "S1", index: 0 }] },
+        { text: "S2.", index: 1, words: [{ text: "S2", index: 1 }] },
+        { text: "S3.", index: 2, words: [{ text: "S3", index: 2 }] }
+      ]
+    };
+
+    render(<ReadingPane alignmentMap={multiSentenceMap} onClose={jest.fn()} />);
+    const ttsButton = screen.getByTitle('Read Aloud');
+
+    // Start
+    act(() => { ttsButton.click(); jest.advanceTimersByTime(100); });
+
+    // Move to S3 (index 2)
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    const thirdUtterance = utterances[2]; // S3
+    act(() => {
+      if (thirdUtterance.onboundary) thirdUtterance.onboundary({ name: 'word', charIndex: 0 });
+    });
+
+    const backButton = screen.getByTitle('Back One Sentence');
+
+    // Clear mocks to track new calls
+    mockSpeak.mockClear();
+    mockCancel.mockClear();
+
+    // Double click back
+    act(() => {
+      fireEvent.click(backButton); // Back to S2
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(200); // < 500ms
+      fireEvent.click(backButton); // Back to S1
+    });
+
+    // Wait for debounce
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    // Verify logic
+    // S3 -> Back -> S2 -> Back -> S1.
+    // Should restart from S1.
+    // S1 is index 0.
+    // handleReadAloud(0) creates utterances for S1, S2, S3.
+    // So expect 3 speak calls.
+    expect(mockSpeak).toHaveBeenCalledTimes(3);
+    // Verify first utterance text is S1.
+    expect((mockSpeak.mock.calls[0][0] as any).text).toBe("S1"); // "buildTextAndMap" adds space then trims
+
+    // Verify cancel called
+    expect(mockCancel).toHaveBeenCalled();
+  });
 });

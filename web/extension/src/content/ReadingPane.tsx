@@ -58,6 +58,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [voiceFetchError, setVoiceFetchError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
+  // Debounce timer for back navigation
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Chunked Playback State
   const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([]);
   const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(-1);
@@ -380,6 +383,10 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     setIsPaused(false);
     setCurrentWordIndex(-1);
     setCurrentChunkIndex(-1);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
   };
 
   const handlePause = () => {
@@ -406,7 +413,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     }
   };
 
-  const handleReadAloud = async () => {
+  const handleReadAloud = async (startSentenceIndex: number = 0) => {
     const tracer = trace.getTracer('readalong-extension');
 
     if (isRecording) {
@@ -474,6 +481,13 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       }
 
       const currentSentenceOffset = globalWordOffset;
+      globalWordOffset += sentence.words.length; // Always increment offset to maintain global alignment
+
+      // Skip sentences before our start index
+      if (sIndex < startSentenceIndex) {
+        return;
+      }
+
       const currentParams = { map, offset: currentSentenceOffset };
 
       utterance.onboundary = (event) => {
@@ -519,7 +533,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       }
 
       newUtterances.push(utterance);
-      globalWordOffset += sentence.words.length;
+      // globalWordOffset increment moved up
     });
 
     utterancesRef.current = newUtterances;
@@ -531,6 +545,111 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       }
       setIsTtsPlaying(true);
     }
+  };
+
+  const handleBackOneSentence = () => {
+    const tracer = trace.getTracer('readalong-extension');
+    tracer.startActiveSpan('ReadingPane.handleBackOneSentence', (span) => {
+      try {
+        if (!alignmentMap) {
+          span.addEvent('No alignment map');
+          return;
+        }
+
+        span.setAttribute('app.voice_source', voiceSource);
+
+        // 1. Determine Current Sentence Index
+        let currentSentenceIndex = -1;
+
+        // For ElevenLabs, use chunk index as proxy if available
+        if (voiceSource === 'elevenlabs' && currentChunkIndex !== -1) {
+          currentSentenceIndex = currentChunkIndex;
+        } else if (currentWordIndex !== -1) {
+          // Search based on current word
+          // Optimized: Find the sentence that contains this word
+          // We can iterate alignmentMap.sentences
+          currentSentenceIndex = alignmentMap.sentences.findIndex(s =>
+            s.words.some(w => w === allWords[currentWordIndex]) // Object identity check
+          );
+        }
+
+        span.setAttribute('app.current_sentence_index', currentSentenceIndex);
+
+        if (currentSentenceIndex <= 0) {
+          console.log('Cannot go back: At start or invalid index');
+          span.addEvent('Cannot go back: At start or invalid index');
+          return;
+        }
+
+        const targetSentenceIndex = currentSentenceIndex - 1;
+        console.log(`[BackNav] Going back to sentence/chunk ${targetSentenceIndex}`);
+        span.setAttribute('app.target_sentence_index', targetSentenceIndex);
+
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          span.addEvent('Cleared existing debounce timer');
+        }
+
+        // 2. Handle ElevenLabs
+        if (voiceSource === 'elevenlabs') {
+          // Optimistic update
+          setCurrentChunkIndex(targetSentenceIndex);
+          const targetChunk = audioChunksRef.current[targetSentenceIndex];
+          if (targetChunk) {
+            setCurrentWordIndex(targetChunk.startWordIndex);
+          }
+
+          debounceTimerRef.current = setTimeout(() => {
+            playChunk(targetSentenceIndex);
+          }, 500);
+          return;
+        }
+
+        // 3. Handle System TTS / Recorded Audio
+
+        // Check if we are using Audio Element (Recorded Audio playback)
+        // Note: System TTS uses SpeechSynthesis, not audioRef (usually)
+        // But recordedAudioUrl uses audioRef.
+        if (activeAudioUrl && voiceSource === 'system') {
+          const targetSentence = alignmentMap.sentences[targetSentenceIndex];
+          // Optimistic UI update
+          if (targetSentence.words.length > 0) {
+            const firstWord = targetSentence.words[0];
+            const globalIndex = allWords.indexOf(firstWord);
+            if (globalIndex !== -1) setCurrentWordIndex(globalIndex);
+
+            debounceTimerRef.current = setTimeout(() => {
+              if (audioRef.current && firstWord.start !== undefined) {
+                audioRef.current.currentTime = firstWord.start;
+                if (audioRef.current.paused) audioRef.current.play();
+              }
+            }, 500);
+          }
+          return;
+        }
+
+        // System TTS
+        if (isTtsPlaying) {
+          window.speechSynthesis.cancel();
+
+          const targetSentence = alignmentMap.sentences[targetSentenceIndex];
+          if (targetSentence && targetSentence.words.length > 0) {
+            const firstWord = targetSentence.words[0];
+            const globalIndex = allWords.indexOf(firstWord);
+            if (globalIndex !== -1) setCurrentWordIndex(globalIndex);
+
+            debounceTimerRef.current = setTimeout(() => {
+              handleReadAloud(targetSentenceIndex);
+            }, 500);
+          }
+        }
+      } catch (e) {
+        span.recordException(e as Error);
+        throw e;
+      } finally {
+        span.end();
+      }
+    });
   };
 
   const showPlaybackControls = isTtsPlaying || isAudioPlaying;
@@ -547,7 +666,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
             {allWords.length > 0 && !showPlaybackControls && (
               <button
                 className="readalong-control-btn"
-                onClick={handleReadAloud}
+                onClick={() => handleReadAloud(0)}
                 title="Read Aloud"
               >
                 Read Aloud
@@ -556,6 +675,14 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
             {showPlaybackControls && (
               <>
+                <button
+                  className="readalong-control-btn"
+                  onClick={() => handleBackOneSentence()}
+                  title="Back One Sentence"
+                  disabled={isGenerating}
+                >
+                  ⏮
+                </button>
                 {isGenerating && <span style={{ fontSize: '12px', marginRight: '5px' }}>Generating...</span>}
                 {!isPaused ? (
                   <button className="readalong-control-btn" onClick={handlePause} title="Pause">

@@ -1,6 +1,6 @@
 # US1-3: Highlight Words in Sync
 
-Status: PROPOSED
+Status: COMPLETED
 
 ## Goal Description
 Implement word-level highlighting that syncs with audio playback. This involves creating a React component that accepts an `AlignmentMap` and the current playback time (or word index) to render the text with the active word highlighted.
@@ -31,12 +31,12 @@ Implement word-level highlighting that syncs with audio playback. This involves 
 
 ## Verification Plan
 ### Automated Tests
-- [ ] Unit tests for `ReadingPane` component:
+- [x] Unit tests for `ReadingPane` component:
     - Verify correct word is highlighted based on props.
     - Verify "active" class is applied only to one word.
-- [ ] Check accessibility contrast ratio for the highlight color.
+- [x] Check accessibility contrast ratio for the highlight color.
 
 ### Manual Verification
-- [ ] Load page, click "Load Text".
-- [ ] Verify words highlight sequentially (simulated playback).
-- [ ] Verify pause/resume works (if UI controls added).
+- [x] Load page, click "Load Text".
+- [x] Verify words highlight sequentially (simulated playback).
+- [x] Verify pause/resume works (if UI controls added).

@@ -12,6 +12,27 @@ interface ReadingPaneProps {
 const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, isSimulating = false }) => {
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  
+  // Accessibility states
+  const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
+  const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
+
+  // Load settings on mount
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(['isDyslexiaFont', 'isHighContrast'], (result) => {
+        if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
+        if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
+      });
+    }
+  }, []);
+
+  // Save settings when they change
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ isDyslexiaFont, isHighContrast });
+    }
+  }, [isDyslexiaFont, isHighContrast]);
 
   // Flatten words for easy indexing
   const allWords: Word[] = React.useMemo(() => {
@@ -36,16 +57,30 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     return () => clearInterval(interval);
   }, [isSimulating, isPlaying, allWords.length]);
 
+  const toggleHighContrast = () => {
+    setIsHighContrast(!isHighContrast);
+  };
+
+  const toggleDyslexiaFont = () => {
+    setIsDyslexiaFont(!isDyslexiaFont);
+  };
+
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
   };
 
   return (
-    <div className="readalong-overlay">
+    <div className={`readalong-overlay ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
       <div className="readalong-container">
         <div className="readalong-header">
           <h2>ReadAlong</h2>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button onClick={toggleDyslexiaFont} className="readalong-control-btn">
+              {isDyslexiaFont ? 'Standard Font' : 'Dyslexia Font'}
+            </button>
+            <button onClick={toggleHighContrast} className="readalong-control-btn">
+              {isHighContrast ? 'Normal Contrast' : 'High Contrast'}
+            </button>
             {alignmentMap && (
               <button onClick={togglePlay} className="readalong-control-btn">
                 {isPlaying ? 'Pause' : 'Play Simulation'}

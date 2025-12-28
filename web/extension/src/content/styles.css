@@ -75,3 +75,46 @@
   background-color: #ffeb3b; /* High contrast yellow */
   color: #000;
 }
+
+/* Accessibility Modes */
+.dyslexia-font {
+  font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif !important;
+}
+
+.high-contrast {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+
+.high-contrast .readalong-container {
+  background-color: #000 !important;
+  border: 2px solid #fff;
+}
+
+.high-contrast .readalong-header {
+  background-color: #222 !important;
+  border-bottom: 1px solid #fff;
+}
+
+.high-contrast .readalong-header h2,
+.high-contrast .readalong-content {
+  color: #fff !important;
+}
+
+.high-contrast .readalong-word.active {
+  background-color: #fff !important;
+  color: #000 !important;
+  outline: 2px solid #ffeb3b;
+}
+
+.readalong-control-btn {
+  padding: 5px 10px;
+  cursor: pointer;
+  background: #e9ecef;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+
+.readalong-control-btn:hover {
+  background: #dee2e6;
+}

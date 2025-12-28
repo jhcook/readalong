@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AlignmentMap, Sentence, Word } from './types';
 import { AudioRecorder } from './audio/AudioRecorder';
+import { SttEngine } from './audio/SttEngine';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -17,10 +18,35 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
   // Recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const audioRecorder = useRef<AudioRecorder>(new AudioRecorder());
+  const sttEngine = useRef<SttEngine>(new SttEngine());
   
   // Accessibility states
   const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
+
+  // STT Result Listener
+  useEffect(() => {
+    const handleSttResult = (event: CustomEvent) => {
+      console.log('STT Event:', event.detail);
+      // Logic to match STT result with alignmentMap would go here
+      // For now, we log it to satisfy AC4
+    };
+
+    window.addEventListener('stt-result' as any, handleSttResult);
+    window.addEventListener('stt-partial' as any, handleSttResult);
+
+    return () => {
+      window.removeEventListener('stt-result' as any, handleSttResult);
+      window.removeEventListener('stt-partial' as any, handleSttResult);
+    };
+  }, []);
+
+  // Cleanup STT on unmount
+  useEffect(() => {
+    return () => {
+      sttEngine.current.terminate();
+    };
+  }, []);
 
   // Load settings on mount
   useEffect(() => {
@@ -78,16 +104,19 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     if (isRecording) {
       try {
         const audioBlob = await audioRecorder.current.stop();
+        sttEngine.current.stop();
         setIsRecording(false);
         console.log('Recording stopped, blob size:', audioBlob.size);
-        // Here we would eventually process the audioBlob
       } catch (error) {
         console.error('Error stopping recording:', error);
       }
     } else {
       try {
-        await audioRecorder.current.start();
-        setIsRecording(true);
+        const stream = await audioRecorder.current.start();
+        if (stream) {
+          await sttEngine.current.start(stream);
+          setIsRecording(true);
+        }
       } catch (error) {
         console.error('Failed to start recording:', error);
         alert('Could not start recording. Please allow microphone access.');

@@ -13,7 +13,7 @@ export class AudioRecorder {
     }
   }
 
-  async start(): Promise<void> {
+  async start(): Promise<MediaStream | null> {
     if (!this.stream) {
       const permitted = await this.requestPermission();
       if (!permitted) {
@@ -21,7 +21,7 @@ export class AudioRecorder {
       }
     }
 
-    if (!this.stream) return;
+    if (!this.stream) return null;
 
     this.mediaRecorder = new MediaRecorder(this.stream);
     this.audioChunks = [];
@@ -31,6 +31,7 @@ export class AudioRecorder {
     };
 
     this.mediaRecorder.start();
+    return this.stream;
   }
 
   stop(): Promise<Blob> {

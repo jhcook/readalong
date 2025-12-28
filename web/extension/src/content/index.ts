@@ -4,6 +4,7 @@ import ReadingPane from './ReadingPane';
 import { extractMainContent } from './extractor';
 import { setupTracing } from './tracing';
 import { SpanStatusCode } from '@opentelemetry/api';
+import { tokenizeText } from './tokenizer';
 
 const tracer = setupTracing();
 
@@ -48,6 +49,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
       const text = extractMainContent(document);
       if (text) {
+        // Tokenize the text. 
+        // We strip HTML tags for tokenization to get the pure text content structure.
+        // In a real scenario, we might map these tokens back to DOM nodes.
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = text;
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        
+        // Store alignment map (AC4) - for now just in memory/processed
+        const alignmentMap = tokenizeText(plainText);
+        
         mountReadingPane(text);
         span.setStatus({ code: SpanStatusCode.OK });
       } else {

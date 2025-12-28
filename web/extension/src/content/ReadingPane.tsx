@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AlignmentMap, Sentence, Word } from './types';
 import { AudioRecorder } from './audio/AudioRecorder';
 import { SttEngine } from './audio/SttEngine';
+import { Aligner, RecognizedWord } from './alignment/Aligner';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 
 interface ReadingPaneProps {
@@ -21,39 +22,24 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const audioRecorder = useRef<AudioRecorder>(new AudioRecorder());
   const sttEngine = useRef<SttEngine>(new SttEngine());
+  const aligner = useRef<Aligner>(new Aligner());
   
   // Accessibility states
   const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
 
-  // STT Result Listener
-  useEffect(() => {
-    const handleSttResult = (event: CustomEvent) => {
-      console.log('STT Event:', event.detail);
-      // Logic to match STT result with alignmentMap would go here
-      // For now, we log it to satisfy AC4
-    };
-
-    window.addEventListener('stt-result' as any, handleSttResult);
-    window.addEventListener('stt-partial' as any, handleSttResult);
-
-    return () => {
-      window.removeEventListener('stt-result' as any, handleSttResult);
-      window.removeEventListener('stt-partial' as any, handleSttResult);
-    };
-  }, []);
-
-  // Cleanup STT on unmount
-  useEffect(() => {
-    return () => {
-      sttEngine.current.terminate();
-    };
-  }, []);
+  // Helper to safely access chrome API
+  const getChrome = () => {
+    if (typeof chrome !== 'undefined') return chrome;
+    if (typeof window !== 'undefined' && (window as any).chrome) return (window as any).chrome;
+    return null;
+  };
 
   // Load settings on mount
   useEffect(() => {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['isDyslexiaFont', 'isHighContrast'], (result) => {
+    const chromeApi = getChrome();
+    if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
+      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast'], (result: any) => {
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
       });
@@ -62,8 +48,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
 
   // Save settings when they change
   useEffect(() => {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ isDyslexiaFont, isHighContrast });
+    const chromeApi = getChrome();
+    if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
+      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast });
     }
   }, [isDyslexiaFont, isHighContrast]);
 
@@ -72,6 +59,39 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
     if (!alignmentMap) return [];
     return alignmentMap.sentences.flatMap(s => s.words);
   }, [alignmentMap]);
+
+  // STT Result Listener
+  useEffect(() => {
+    const handleSttResult = (event: CustomEvent) => {
+      // event.detail is the Vosk result object
+      // { result: Array<{conf, end, start, word}>, text: string } OR { partial: string }
+      
+      const data = event.detail;
+      if (data && data.result && Array.isArray(data.result)) {
+        // We have recognized words
+        const recognizedWords = data.result as RecognizedWord[];
+        
+        // Run alignment
+        // We pass the full reference list (allWords) and the new recognized words
+        const matchedIndex = aligner.current.align(allWords, recognizedWords);
+        
+        if (matchedIndex !== -1) {
+          setCurrentWordIndex(matchedIndex);
+        }
+      }
+    };
+
+    window.addEventListener('stt-result' as any, handleSttResult);
+    // Partial results usually don't have word timestamps in standard Vosk usage unless configured
+    // For now we rely on 'result' (final) which definitely has them if setWords(true) is used.
+    // If we want faster feedback, we might need to parse partials differently or use a different Aligner strategy.
+    
+    return () => {
+      window.removeEventListener('stt-result' as any, handleSttResult);
+    };
+  }, [allWords]);
+
+  // Cleanup STT on unmount
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -116,6 +136,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose, 
       try {
         const stream = await audioRecorder.current.start();
         if (stream) {
+          aligner.current.reset(); // Reset alignment state
           await sttEngine.current.start(stream);
           setIsRecording(true);
         }

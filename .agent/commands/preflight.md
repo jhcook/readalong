@@ -53,6 +53,7 @@ WORKFLOW:
       - Review documentation, naming, commit/PR communication.
       - Check that security/privacy-sensitive changes are properly documented.
       - Ensure lawful basis, retention, and data-handling behavior are reflected in docs where needed.
+      - Verify that `docs/` is updated with information on all new user interactions and that new documents are created if necessary.
     
    e) @Compliance
       - Review for compliance with SOC 2 + GDPR.

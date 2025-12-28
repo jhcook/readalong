@@ -299,6 +299,7 @@ User provides a requirement. You must:
    - [ ] README updated (if new feature)
    - [ ] Configuration changes documented
    - [ ] Breaking changes noted
+   - [ ] Update `docs/` with detailed information on all new user interactions. Create new documents if necessary to cover new workflows or features.
 
 4. **Compliance Documentation** (if required)
    - [ ] Data handling documented

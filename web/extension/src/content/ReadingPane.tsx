@@ -652,6 +652,111 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     });
   };
 
+  const handleForwardOneSentence = () => {
+    const tracer = trace.getTracer('readalong-extension');
+    tracer.startActiveSpan('ReadingPane.handleForwardOneSentence', (span) => {
+      try {
+        if (!alignmentMap) {
+          span.addEvent('No alignment map');
+          return;
+        }
+
+        span.setAttribute('app.voice_source', voiceSource);
+
+        // 1. Determine Current Sentence Index
+        let currentSentenceIndex = -1;
+
+        // For ElevenLabs, use chunk index as proxy if available
+        if (voiceSource === 'elevenlabs' && currentChunkIndex !== -1) {
+          currentSentenceIndex = currentChunkIndex;
+        } else if (currentWordIndex !== -1) {
+          // Search based on current word
+          currentSentenceIndex = alignmentMap.sentences.findIndex(s =>
+            s.words.some(w => w === allWords[currentWordIndex]) // Object identity check
+          );
+        }
+
+        span.setAttribute('app.current_sentence_index', currentSentenceIndex);
+
+        if (currentSentenceIndex === -1) {
+          console.log('Cannot go forward: invalid index');
+          span.addEvent('Cannot go forward: invalid index');
+          return;
+        }
+
+        const targetSentenceIndex = currentSentenceIndex + 1;
+        console.log(`[Nav] Going forward to sentence/chunk ${targetSentenceIndex}`);
+        span.setAttribute('app.target_sentence_index', targetSentenceIndex);
+
+        if (targetSentenceIndex >= alignmentMap.sentences.length) {
+          console.log('Cannot go forward: End of text');
+          span.addEvent('Cannot go forward: End of text');
+          return;
+        }
+
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          span.addEvent('Cleared existing debounce timer');
+        }
+
+        // 2. Handle ElevenLabs
+        if (voiceSource === 'elevenlabs') {
+          // Optimistic update
+          setCurrentChunkIndex(targetSentenceIndex);
+          const targetChunk = audioChunksRef.current[targetSentenceIndex];
+          if (targetChunk) {
+            setCurrentWordIndex(targetChunk.startWordIndex);
+          }
+
+          debounceTimerRef.current = setTimeout(() => {
+            playChunk(targetSentenceIndex);
+          }, 500);
+          return;
+        }
+
+        // 3. Handle System TTS / Recorded Audio
+        if (activeAudioUrl && voiceSource === 'system') {
+          const targetSentence = alignmentMap.sentences[targetSentenceIndex];
+          // Optimistic UI update
+          if (targetSentence.words.length > 0) {
+            const firstWord = targetSentence.words[0];
+            const globalIndex = allWords.indexOf(firstWord);
+            if (globalIndex !== -1) setCurrentWordIndex(globalIndex);
+
+            debounceTimerRef.current = setTimeout(() => {
+              if (audioRef.current && firstWord.start !== undefined) {
+                audioRef.current.currentTime = firstWord.start;
+                if (audioRef.current.paused) audioRef.current.play();
+              }
+            }, 500);
+          }
+          return;
+        }
+
+        // System TTS
+        if (isTtsPlaying) {
+          window.speechSynthesis.cancel();
+
+          const targetSentence = alignmentMap.sentences[targetSentenceIndex];
+          if (targetSentence && targetSentence.words.length > 0) {
+            const firstWord = targetSentence.words[0];
+            const globalIndex = allWords.indexOf(firstWord);
+            if (globalIndex !== -1) setCurrentWordIndex(globalIndex);
+
+            debounceTimerRef.current = setTimeout(() => {
+              handleReadAloud(targetSentenceIndex);
+            }, 500);
+          }
+        }
+      } catch (e) {
+        span.recordException(e as Error);
+        throw e;
+      } finally {
+        span.end();
+      }
+    });
+  };
+
   const showPlaybackControls = isTtsPlaying || isAudioPlaying;
 
   return (
@@ -682,6 +787,14 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                   disabled={isGenerating}
                 >
                   ⏮
+                </button>
+                <button
+                  className="readalong-control-btn"
+                  onClick={() => handleForwardOneSentence()}
+                  title="Forward One Sentence"
+                  disabled={isGenerating}
+                >
+                  ⏭
                 </button>
                 {isGenerating && <span style={{ fontSize: '12px', marginRight: '5px' }}>Generating...</span>}
                 {!isPaused ? (

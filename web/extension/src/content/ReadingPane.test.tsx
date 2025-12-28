@@ -411,4 +411,108 @@ describe('ReadingPane', () => {
     // Verify cancel called
     expect(mockCancel).toHaveBeenCalled();
   });
+
+  it('navigates forward one sentence during System TTS', () => {
+    const multiSentenceMap: AlignmentMap = {
+      fullText: "Sentence one. Sentence two. Sentence three.",
+      sentences: [
+        { text: "Sentence one.", index: 0, words: [{ text: "Sentence", index: 0 }, { text: "one", index: 1 }] },
+        { text: "Sentence two.", index: 1, words: [{ text: "Sentence", index: 2 }, { text: "two", index: 3 }] },
+        { text: "Sentence three.", index: 2, words: [{ text: "Sentence", index: 4 }, { text: "three", index: 5 }] }
+      ]
+    };
+
+    render(<ReadingPane alignmentMap={multiSentenceMap} onClose={jest.fn()} />);
+    const ttsButton = screen.getByTitle('Read Aloud');
+
+    // Start reading (Sentence 0)
+    act(() => {
+      ttsButton.click();
+      jest.advanceTimersByTime(100);
+    });
+
+    // Manually trigger onstart to set state to playing/Sentence 0
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    const firstUtterance = utterances[0];
+    act(() => {
+      if (firstUtterance.onstart) firstUtterance.onstart();
+    });
+
+    // Currently at Sentence 0. Forward -> Sentence 1.
+    const forwardButton = screen.getByTitle('Forward One Sentence');
+
+    // Clear mocks
+    mockSpeak.mockClear();
+    mockCancel.mockClear();
+
+    act(() => {
+      forwardButton.click();
+    });
+
+    // Wait for debounce
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    expect(mockCancel).toHaveBeenCalled();
+    // Restart from Sentence 1. Expect 2 speak calls (S1, S2, since S0 is skipped).
+    // sentences.length = 3. 
+    // handleReadAloud(1) -> loop sIndex 1 to 2.
+    // S1, S2.
+    expect(mockSpeak).toHaveBeenCalledTimes(2);
+    expect((mockSpeak.mock.calls[0][0] as any).text).toBe("Sentence two");
+  });
+
+  it('debounces forward clicks', () => {
+    const multiSentenceMap: AlignmentMap = {
+      fullText: "S1. S2. S3.",
+      sentences: [
+        { text: "S1.", index: 0, words: [{ text: "S1", index: 0 }] },
+        { text: "S2.", index: 1, words: [{ text: "S2", index: 1 }] },
+        { text: "S3.", index: 2, words: [{ text: "S3", index: 2 }] }
+      ]
+    };
+
+    render(<ReadingPane alignmentMap={multiSentenceMap} onClose={jest.fn()} />);
+    const ttsButton = screen.getByTitle('Read Aloud');
+
+    // Start
+    act(() => { ttsButton.click(); jest.advanceTimersByTime(100); });
+
+    // Manually trigger onstart
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    const firstUtterance = utterances[0];
+    act(() => {
+      if (firstUtterance.onstart) firstUtterance.onstart();
+    });
+    // At S1.
+
+    const forwardButton = screen.getByTitle('Forward One Sentence');
+
+    // Clear mocks
+    mockSpeak.mockClear();
+    mockCancel.mockClear();
+
+    // Double click forward
+    act(() => {
+      fireEvent.click(forwardButton); // Forward to S2
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(200); // < 500ms
+      fireEvent.click(forwardButton); // Forward to S3
+    });
+
+    // Wait for debounce
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    // S1 -> S2 -> S3.
+    // handleReadAloud(2). S3 only.
+    // Expect 1 speak call.
+    expect(mockSpeak).toHaveBeenCalledTimes(1);
+    expect((mockSpeak.mock.calls[0][0] as any).text).toBe("S3");
+    expect(mockCancel).toHaveBeenCalled();
+  });
 });

@@ -14,9 +14,25 @@ const Popup = () => {
     }
   };
 
+
+
+  const handleSelectContent = async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id) {
+        await chrome.tabs.sendMessage(tab.id, { type: 'ENTER_SELECTION_MODE' });
+        window.close();
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      alert('Error: Could not communicate with the page. Try refreshing the page.');
+    }
+  };
+
   return (
     <div>
       <button onClick={handleLoadText}>Load Text from Page</button>
+      <button onClick={handleSelectContent} style={{ marginTop: '10px' }}>Select Content</button>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { extractMainContent } from './extractor';
+import { extractMainContent, sanitizeContent } from './extractor';
 
 describe('extractMainContent', () => {
   it('extracts text from the main article and ignores navigation', () => {
@@ -63,6 +63,27 @@ describe('extractMainContent', () => {
     expect(result).not.toContain('<iframe>');
     expect(result).not.toContain('<style>');
     // DIV is also not in allowed tags
+    expect(result).not.toContain('<div>');
+  });
+});
+
+describe('sanitizeContent', () => {
+  it('sanitizes dangerous HTML and only keeps allowed tags', () => {
+    const input = `
+            <h1>Title</h1>
+            <p>Safe paragraph.</p>
+            <script>alert("xss")</script>
+            <div onclick="alert('xss')">Click me</div>
+            <iframe src="https://evil.com"></iframe>
+            <style>body { color: red; }</style>
+        `;
+    const result = sanitizeContent(input);
+    expect(result).toContain('<h1>Title</h1>');
+    expect(result).toContain('<p>Safe paragraph.</p>');
+    expect(result).not.toContain('<script>');
+    expect(result).not.toContain('onclick');
+    expect(result).not.toContain('<iframe>');
+    expect(result).not.toContain('<style>');
     expect(result).not.toContain('<div>');
   });
 });

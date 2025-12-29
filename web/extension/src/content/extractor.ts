@@ -25,12 +25,12 @@ export function extractMainContent(doc: Document): string {
 
   // Look at common content containers
   let candidates = Array.from(clone.querySelectorAll('article, main, .content, .main, #content, #main'));
-  
+
   // If no specific containers found, fallback to body
   if (candidates.length === 0) {
     candidates = [clone.body];
   }
-  
+
   for (const container of candidates) {
     const el = container as HTMLElement;
     const text = (el.innerText || el.textContent || '').trim();
@@ -45,9 +45,16 @@ export function extractMainContent(doc: Document): string {
   }
 
   // Use DOMPurify to sanitize the HTML
-  // We only allow basic formatting tags for a clean reading experience
   const content = (bestElement as HTMLElement).innerHTML;
-  return DOMPurify.sanitize(content, {
+  return sanitizeContent(content);
+}
+
+/**
+ * Sanitizes HTML content to ensure it is safe and contains only allowed tags.
+ */
+export function sanitizeContent(html: string): string {
+  // We only allow basic formatting tags for a clean reading experience
+  return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['p', 'b', 'i', 'em', 'strong', 'h1', 'h2', 'h3', 'br', 'ul', 'ol', 'li'],
     ALLOWED_ATTR: []
   });

@@ -117,16 +117,44 @@ export class SystemProvider implements ReadingProvider {
         }
     }
 
+    private isNetworkVoice(): boolean {
+        if (!this.voice) return false;
+        // Heuristic for network voices that don't resume correctly
+        return this.voice.localService === false ||
+            this.voice.name.includes('Google') ||
+            this.voice.name.includes('Online');
+    }
+
     pause(): void {
-        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-            window.speechSynthesis.pause();
+        const isSpeaking = window.speechSynthesis.speaking; // Speaking state
+        // Note: speaking is true even if paused.
+
+        if (isSpeaking && !window.speechSynthesis.paused) {
+            if (this.isNetworkVoice()) {
+                // Network voices often fail to resume. workaround: Stop and track state.
+                window.speechSynthesis.cancel();
+            } else {
+                window.speechSynthesis.pause();
+            }
             this.isPaused = true;
         }
     }
 
     resume(): void {
-        if (window.speechSynthesis.paused) {
-            window.speechSynthesis.resume();
+        if (this.isPaused) {
+            if (this.isNetworkVoice()) {
+                // Restart from current sentence
+                // We need to ensure isPaused is cleared before play, 
+                // but play() sets isPaused=false anyway.
+                if (this.currentSentenceIndex !== -1) {
+                    this.play(this.currentSentenceIndex);
+                } else {
+                    // Fallback if index lost
+                    this.play(0);
+                }
+            } else {
+                window.speechSynthesis.resume();
+            }
             this.isPaused = false;
         }
     }

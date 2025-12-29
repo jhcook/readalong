@@ -76,19 +76,20 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   // Auto-scroll logic
   useEffect(() => {
     if (currentWordIndex >= 0 && containerRef.current) {
-      const activeEl = containerRef.current.querySelector('.readalong-word.active') as HTMLElement;
-      if (activeEl && !isMinimized) {
+      const activeElements = containerRef.current.querySelectorAll('.readalong-word.active');
+      if (activeElements.length > 0 && !isMinimized) {
         const containerRect = containerRef.current.getBoundingClientRect();
-        const activeRect = activeEl.getBoundingClientRect();
+        const firstActiveRect = activeElements[0].getBoundingClientRect();
+        const lastActiveRect = activeElements[activeElements.length - 1].getBoundingClientRect();
 
-        // Check if the element is below the bottom of the container (or partially below)
-        // We use a small buffer (e.g. 5px) to handle sub-pixel rendering issues
-        if (activeRect.bottom > containerRect.bottom - 5) {
-          activeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Check if the bottom of the highlight (last word) is below the container bottom
+        if (lastActiveRect.bottom > containerRect.bottom - 5) {
+          // Scroll the FIRST word to the top to ensure user sees the start of the highlight
+          activeElements[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        // Optional: Also handle if it's above the top (e.g. user scrolled up or back nav)
-        else if (activeRect.top < containerRect.top) {
-          activeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Check if the top of the highlight (first word) is above the container top
+        else if (firstActiveRect.top < containerRect.top) {
+          activeElements[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }
     }

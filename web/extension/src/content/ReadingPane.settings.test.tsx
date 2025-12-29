@@ -190,4 +190,44 @@ describe('ReadingPane Settings & Fallback', () => {
         expect((window.speechSynthesis.speak as jest.Mock)).not.toHaveBeenCalled();
     });
 
+    it('STOPS playback if voice settings change while playing', async () => {
+        // Mock initial settings
+        mockGet.mockImplementation((keys, callback) => {
+            callback({
+                voiceSource: 'system',
+                systemVoiceURI: 'Google US English'
+            });
+        });
+
+        const { rerender } = render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+        await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+        // Start Playback
+        const ttsButton = screen.getByTitle('Read Aloud');
+        act(() => { ttsButton.click(); });
+
+        // Verify System TTS started
+        expect(window.speechSynthesis.speak).toHaveBeenCalled();
+
+        // Simulate changing settings (e.g., via the UI or external storage change reflected in internal state)
+        // We will simulate clicking the settings UI to change voice source
+        const settingsButton = screen.getByTitle('Settings');
+        act(() => { settingsButton.click(); });
+
+        const sourceSelect = screen.getByLabelText('Voice Source') as HTMLSelectElement;
+        expect(sourceSelect).toBeInTheDocument();
+
+        // Change to ElevenLabs
+        act(() => {
+            fireEvent.change(sourceSelect, { target: { value: 'elevenlabs' } });
+        });
+
+        // Current implementation: changing settings triggers useEffect which calls handleStop()
+        // handleStop() -> readingProvider.current.stop() -> SystemProvider.stop() -> speechSynthesis.cancel()
+
+        await waitFor(() => {
+            expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+        });
+    });
+
 });

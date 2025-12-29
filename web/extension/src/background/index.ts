@@ -129,6 +129,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     })
                 });
 
+                console.log(`[Background] Generated audio for VoiceID: ${voiceId} with Model: eleven_multilingual_v2`);
+
+
+
                 if (!resp.ok) {
                     const errorText = await resp.text();
                     throw new Error(`API Error: ${resp.status} ${errorText}`);

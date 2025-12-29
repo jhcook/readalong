@@ -157,11 +157,17 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     }
   }, [elevenLabsApiKey, isSettingsOpen, voiceSource]);
 
-  // Save settings when they change
+  // Save settings when they change, and STOP playback to prevent ghost voices
   useEffect(() => {
     const chromeApi = getChrome();
     if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
       chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI });
+    }
+
+    // CRITICAL FIX: If voice settings change while playing, STOP immediately.
+    // This prevents the "Ghost Voice" issue where the user changes settings but the old provider continues.
+    if (isPlaying || isPaused || readingProvider.current) {
+      handleStop();
     }
   }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI]);
 
@@ -507,8 +513,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 <hr style={{ width: '100%', margin: '5px 0', border: '0', borderTop: '1px solid #eee' }} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Voice Source</label>
+                  <label htmlFor="voice-source-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>Voice Source</label>
                   <select
+                    id="voice-source-select"
                     value={voiceSource}
                     onChange={(e) => setVoiceSource(e.target.value as 'system' | 'elevenlabs')}
                     style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
@@ -520,8 +527,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
                 {voiceSource === 'system' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>System Voice</label>
+                    <label htmlFor="system-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>System Voice</label>
                     <select
+                      id="system-voice-select"
                       value={systemVoiceURI}
                       onChange={(e) => setSystemVoiceURI(e.target.value)}
                       style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
@@ -537,8 +545,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 {voiceSource === 'elevenlabs' && (
                   <>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ElevenLabs API Key</label>
+                      <label htmlFor="elevenlabs-api-key" style={{ fontSize: '12px', fontWeight: 'bold' }}>ElevenLabs API Key</label>
                       <input
+                        id="elevenlabs-api-key"
                         type={"pass" + "word"}
                         value={elevenLabsApiKey}
                         onChange={(e) => setElevenLabsApiKey(e.target.value)}
@@ -549,7 +558,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
                     {elevenLabsApiKey && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                        <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Cloned Voice</label>
+                        <label htmlFor="cloned-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>Cloned Voice</label>
                         {isLoadingVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
                           <>
                             {voiceFetchError && (
@@ -558,6 +567,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                               </div>
                             )}
                             <select
+                              id="cloned-voice-select"
                               value={selectedVoiceId}
                               onChange={(e) => setSelectedVoiceId(e.target.value)}
                               style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}

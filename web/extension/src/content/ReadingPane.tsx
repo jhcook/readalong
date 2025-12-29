@@ -25,6 +25,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'professional' | 'playful' | 'academic' | 'building-blocks' | 'minimal'>('professional');
   const [settingsLoaded, setSettingsLoaded] = useState<boolean>(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
   const isOnline = useNetworkStatus();
@@ -103,7 +104,8 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName'], (result: any) => {
+      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName'], (result: any) => {
+        if (result.theme) setTheme(result.theme);
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
         if (result.elevenLabsApiKey) setElevenLabsApiKey(result.elevenLabsApiKey);
@@ -198,7 +200,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName });
+      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName });
     }
 
     // CRITICAL FIX: If voice settings change while playing, STOP immediately.
@@ -206,7 +208,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     if (isPlaying || isPaused || readingProvider.current) {
       handleStop();
     }
-  }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName]);
+  }, [theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -492,7 +494,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     (activeSystemVoice.localService === false || activeSystemVoice.name.includes('Google'));
 
   return (
-    <div className={`readalong-overlay ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
+    <div className={`readalong-overlay theme-${theme} ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
       <div className="readalong-container">
         <div className="readalong-header">
           <h2>
@@ -579,6 +581,22 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 <button onClick={toggleHighContrast} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
                   {isHighContrast ? '✓ High Contrast' : 'High Contrast'}
                 </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
+                  <label htmlFor="theme-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>Theme</label>
+                  <select
+                    id="theme-select"
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value as 'professional' | 'playful' | 'academic' | 'building-blocks' | 'minimal')}
+                    style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    <option value="professional">Professional (Office)</option>
+                    <option value="minimal">Minimal (Plain)</option>
+                    <option value="academic">Academic (Ivory Tower)</option>
+                    <option value="playful">Playful (Bubbles)</option>
+                    <option value="building-blocks">Building Blocks</option>
+                  </select>
+                </div>
 
                 <hr style={{ width: '100%', margin: '5px 0', border: '0', borderTop: '1px solid #eee' }} />
 

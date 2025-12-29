@@ -64,3 +64,20 @@ Parents or users can record their own voice to be used for the read-along featur
     c. Click **"Read Aloud"** (Play button) to hear your recording synchronized with the text.
 
 *Note: Recordings are currently stored in your browser's memory for the current session.*
+
+## 5. Visual Themes
+
+Customize the look and feel of the reading pane to match your preference or environment.
+
+**How to use:**
+1. Click the **Settings** (gear) icon in the reading pane header.
+2. Find the **"Theme"** dropdown menu.
+3. Select one of the available themes:
+    - **Professional (Office):** Clean, standard look suitable for work environments (default).
+    - **Minimal (Plain):** Stripped-down design focusing purely on the text.
+    - **Academic (Ivory Tower):** Warm, paper-like background with serif fonts, ideal for long reading sessions.
+    - **Playful (Bubbles):** Fun, colorful design with comic-style fonts.
+    - **Building Blocks:** High-contrast, blocky design with distinct colors.
+
+**Persistence:**
+Your selected theme is saved automatically and will apply to future sessions.

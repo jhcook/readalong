@@ -1,4 +1,20 @@
 .readalong-overlay {
+  /* Default Theme Variables (Professional) */
+  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --bg-color: white;
+  --text-color: #222;
+  --header-bg: #f8f9fa;
+  --header-text: #333;
+  --border-color: #dee2e6;
+  --container-radius: 12px;
+  --word-radius: 3px;
+  --active-word-bg: #ffeb3b;
+  --active-word-text: #000;
+  --close-btn-color: #666;
+  --close-btn-hover: #000;
+  --control-btn-bg: #e9ecef;
+  --control-btn-hover: #dee2e6;
+
   position: fixed;
   top: 0;
   left: 0;
@@ -9,25 +25,97 @@
   justify-content: center;
   align-items: center;
   z-index: 2147483647;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-family);
+}
+
+/* Playful Theme */
+.readalong-overlay.theme-playful {
+  --font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif;
+  --bg-color: #fff0f5;
+  /* Lavender Blush */
+  --header-bg: #e1f5fe;
+  /* Light Blue */
+  --header-text: #E91E63;
+  /* Pink */
+  --container-radius: 24px;
+  --word-radius: 10px;
+  --active-word-bg: #E91E63;
+  --active-word-text: white;
+  --control-btn-bg: #E1F5FE;
+  --control-btn-hover: #B3E5FC;
+}
+
+/* Building Blocks Theme */
+.readalong-overlay.theme-building-blocks {
+  --font-family: 'Verdana', Geneva, sans-serif;
+  --bg-color: #fff8e1;
+  /* Amber 50 */
+  --header-bg: #ff5252;
+  /* Red accent */
+  --header-text: #fff;
+  --container-radius: 4px;
+  --word-radius: 2px;
+  --active-word-bg: #2196f3;
+  /* Blue */
+  --active-word-text: #fff;
+  --control-btn-bg: #fff;
+  --control-btn-hover: #ffcdd2;
+}
+
+/* Academic Theme (Ivory Tower) */
+.readalong-overlay.theme-academic {
+  --font-family: 'Georgia', 'Times New Roman', serif;
+  --bg-color: #FFFFF0;
+  /* Ivory */
+  --header-bg: #EAE3D2;
+  /* Muted Beige */
+  --header-text: #3E2723;
+  /* Dark Brown */
+  --container-radius: 2px;
+  --word-radius: 2px;
+  --active-word-bg: #C5E1A5;
+  /* Light Green */
+  --active-word-text: #000;
+  --control-btn-bg: #F5F5DC;
+  /* Beige */
+  --control-btn-hover: #E6E6FA;
+}
+
+/* Minimal Theme (Plain/Unthemed) */
+.readalong-overlay.theme-minimal {
+  --font-family: system-ui, -apple-system, sans-serif;
+  --bg-color: #ffffff;
+  --header-bg: #fff;
+  --header-text: #000;
+  --border-color: #000;
+  --container-radius: 0;
+  --word-radius: 0;
+  --active-word-bg: #eee;
+  --active-word-text: #000;
+  --control-btn-bg: #fff;
+  --control-btn-hover: #eee;
+  /* Minimal specific overrides via specificity if needed, or rely on vars */
 }
 
 .readalong-container {
   width: 80%;
   max-width: 800px;
   height: 80%;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  background: var(--bg-color);
+  border-radius: var(--container-radius);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  /* Added border support */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .readalong-header {
   padding: 15px 25px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -36,7 +124,7 @@
 .readalong-header h2 {
   margin: 0;
   font-size: 1.5rem;
-  color: #333;
+  color: var(--header-text);
 }
 
 .readalong-close-btn {
@@ -44,12 +132,12 @@
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  color: #666;
+  color: var(--close-btn-color);
   line-height: 1;
 }
 
 .readalong-close-btn:hover {
-  color: #000;
+  color: var(--close-btn-hover);
 }
 
 .readalong-content {
@@ -57,7 +145,7 @@
   overflow-y: auto;
   line-height: 1.6;
   font-size: 1.2rem;
-  color: #222;
+  color: var(--text-color);
 }
 
 .readalong-content p {
@@ -67,56 +155,53 @@
 .readalong-word {
   display: inline-block;
   padding: 0 2px;
-  border-radius: 3px;
+  border-radius: var(--word-radius);
   transition: background-color 0.1s ease;
 }
 
 .readalong-word.active {
-  background-color: #ffeb3b; /* High contrast yellow */
-  color: #000;
+  background-color: var(--active-word-bg);
+  color: var(--active-word-text);
 }
 
-/* Accessibility Modes */
+/* Accessibility Modes (Overrides) */
 .dyslexia-font {
-  font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif !important;
+  --font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif !important;
 }
 
 .high-contrast {
-  background-color: #000 !important;
-  color: #fff !important;
+  --bg-color: #000 !important;
+  --text-color: #fff !important;
+  --header-bg: #222 !important;
+  --header-text: #fff !important;
+  --active-word-bg: #fff !important;
+  --active-word-text: #000 !important;
+  --border-color: #fff !important;
+  --control-btn-bg: #333 !important;
+  --control-btn-hover: #555 !important;
 }
 
+/* High Contrast Specifics requiring strict overrides */
 .high-contrast .readalong-container {
-  background-color: #000 !important;
   border: 2px solid #fff;
 }
 
-.high-contrast .readalong-header {
-  background-color: #222 !important;
-  border-bottom: 1px solid #fff;
-}
-
-.high-contrast .readalong-header h2,
-.high-contrast .readalong-content {
-  color: #fff !important;
-}
-
 .high-contrast .readalong-word.active {
-  background-color: #fff !important;
-  color: #000 !important;
   outline: 2px solid #ffeb3b;
 }
 
 .readalong-control-btn {
   padding: 5px 10px;
   cursor: pointer;
-  background: #e9ecef;
+  background: var(--control-btn-bg);
   border: 1px solid #ced4da;
+  /* Keep border for structure */
   border-radius: 4px;
+  /* Keep consistent button shape across themes? Or utilize radius var? Let's keep simpler. */
 }
 
 .readalong-control-btn:hover {
-  background: #dee2e6;
+  background: var(--control-btn-hover);
 }
 
 .readalong-control-btn.recording {
@@ -127,7 +212,15 @@
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }

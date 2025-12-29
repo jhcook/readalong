@@ -263,4 +263,53 @@ describe('ReadingPane Settings & Fallback', () => {
         });
     });
 
+    it('loads theme from storage and applies correct class', async () => {
+        mockGet.mockImplementation((keys, callback) => {
+            callback({ theme: 'playful' });
+        });
+
+        render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+        // Wait for settings load
+        await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+        const wrapper = screen.getByText('ReadAlong').closest('.readalong-overlay');
+        expect(wrapper).toHaveClass('theme-playful');
+    });
+
+    it('persists theme selection when changed', async () => {
+        mockGet.mockImplementation((keys, callback) => callback({})); // Default 'professional'
+
+        render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+        await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+        // Open Settings
+        const settingsButton = screen.getByTitle('Settings');
+        act(() => { settingsButton.click(); });
+
+        // Change Theme
+        const themeSelect = screen.getByLabelText('Theme');
+        fireEvent.change(themeSelect, { target: { value: 'academic' } });
+
+        await waitFor(() => {
+            expect(mockSet).toHaveBeenCalled();
+        });
+
+        expect(mockSet.mock.calls[0][0]).toMatchObject({ theme: 'academic' });
+    });
+
+    it('applies building-blocks theme correctly', async () => {
+        mockGet.mockImplementation((keys, callback) => {
+            callback({ theme: 'building-blocks' });
+        });
+
+        render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+        // Wait for settings load
+        await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+        const wrapper = screen.getByText('ReadAlong').closest('.readalong-overlay');
+        expect(wrapper).toHaveClass('theme-building-blocks');
+    });
+
 });

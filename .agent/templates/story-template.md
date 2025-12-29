@@ -14,11 +14,16 @@ As a <user>, I want <capability> so that <value>.
 - [ ] **Scenario 2**: <Condition> must be met.
 - [ ] **Negative Test**: System handles <error case> gracefully.
 
+## Observability Requirements
+- [ ] **Tracing**: Is end-to-end tracing implemented for new flows?
+- [ ] **Logging**: Are errors and key state changes logged (without PII)?
+- [ ] **Metrics**: Are there new metrics for business success or failure?
+- [ ] **Alerts**: Any new alert conditions?
+
 ## Non-Functional Requirements
 - Performance
 - Security
 - Compliance
-- Observability
 
 ## Linked ADRs
 - ADR-XXX

@@ -131,23 +131,23 @@ BLOCK if:
 - New or changed personal data handling has no recorded purpose, lawful basis, or retention/deletion notes where they are clearly needed.
 - Commit/PR communication is so vague that the change is not auditable.
 
-#### @Observability (Observability, SOC 2 & GDPR Evidence)
+#### @Observability (Observability, Logging, & Tracing)
 
 Must enforce:
 
 - SOC 2:
-  - Security- and infra-sensitive changes must be documented (design docs, README, ADR, etc. as appropriate).
-  - Commit/PR messages must explain intent, risk, and impact.
+  - All critical paths (user actions, API handlers, background jobs) must have OpenTelemetry tracing.
+  - Errors must be logged with stack traces and context (trace IDs).
+  - Metrics should be defined for key business logic (success/failure rates, latency).
 - GDPR:
-  - New personal data fields, processors, or flows must be documented.
-  - Lawful basis, retention, and deletion behavior must be described where relevant.
-  - Logs and errors must be clearly PII-safe or explicitly redacted.
+  - Logs and traces must NOT contain PII or sensitive user data.
 
 BLOCK if:
 
-- Security/privacy-sensitive changes lack documentation.
-- New or changed personal data handling has no recorded purpose, lawful basis, or retention/deletion notes where they are clearly needed.
-- Commit/PR communication is so vague that the change is not auditable.
+- New features or non-trivial logic are added without corresponding traces/spans.
+- Error swallowing occurred without logging.
+- Structured logging is not used (e.g. using `print` instead of `logger`).
+- Logging or tracing obviously includes PII.
 
 ---
 
@@ -197,4 +197,3 @@ ROLE: @QA
 ROLE: @Docs
 ...
 ```
-ß

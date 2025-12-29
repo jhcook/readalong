@@ -3,7 +3,12 @@ A cross‑platform, privacy‑first read‑along experience for children
 Supports Chrome, Firefox, Edge, Safari, iOS, Android
 
 🌟 Overview
-ReadAlong+ is a hybrid, cross‑platform reading companion that allows children to follow along with stories using:
+ReadAlong+ is a hybrid, cross‑platform reading companion that allows children to follow along with stories using parent or cloned voices.
+
+> [!NOTE]
+> **Current Status**: The core functionality is currently available as a **Web Extension** for Chrome, Edge, Firefox, and Safari. The mobile app and standalone web app are in the roadmap.
+
+The system is designed to run on:
 
 A parent’s real voice (captured and aligned locally)
 

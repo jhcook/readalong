@@ -1,6 +1,6 @@
-# ReadAlong Chrome Extension
+# ReadAlong Web Extension
 
-This directory contains the source code for the ReadAlong Chrome Extension.
+This directory contains the source code for the ReadAlong Extension.
 
 ## Development
 
@@ -45,12 +45,14 @@ The generated zip files will be located in the `release/` directory.
 
 For detailed instructions on publishing to official browser stores (Chrome, Firefox, Edge, Safari), see the [Distribution Guide](../../docs/distribution.md).
 
-### Loading into Chrome
+### Loading the Extension
 
-1.  Open Chrome and navigate to `chrome://extensions`.
-2.  Enable "Developer mode" in the top right corner.
-3.  Click "Load unpacked".
-4.  Select the `dist` directory inside `web/extension` (Note: Webpack output is configured to `dist`, but manifest might be copied there. Ensure you pick the folder containing `manifest.json`. If `dist` is the output, point to it. Based on `webpack.config.js`, `copy-webpack-plugin` usually copies static assets like `manifest.json` to `dist`).
+For detailed installation instructions for **Chrome**, **Firefox**, **Edge**, and **Safari**, please refer to the main [Installation Guide](../../INSTALL.md).
+
+1.  **Build**: Run `npm run build`.
+2.  **Chrome/Edge**: Load unpacked from `web/extension/dist`.
+3.  **Firefox**: Load temporary add-on from `web/extension/dist` (or `web/extension/dist-firefox` if packaged).
+4.  **Safari**: Requires converting the web extension (see [Distribution](../../docs/distribution.md)).
 
 ## Project Structure
 

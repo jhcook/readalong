@@ -43,6 +43,9 @@ const mockRevokeObjectURL = jest.fn();
 global.URL.createObjectURL = mockCreateObjectURL;
 global.URL.revokeObjectURL = mockRevokeObjectURL;
 
+// Mock scrollIntoView
+Element.prototype.scrollIntoView = jest.fn();
+
 // Mock SpeechSynthesis
 const mockSpeak = jest.fn();
 const mockCancel = jest.fn();
@@ -531,5 +534,42 @@ describe('ReadingPane', () => {
     expect(mockSpeak).toHaveBeenCalledTimes(1);
     expect((mockSpeak.mock.calls[0][0] as any).text).toBe("S3");
     expect(mockCancel).toHaveBeenCalled();
+  });
+
+  it('scrolls active word into view when it goes below container bottom', () => {
+    // Mock scrollIntoView
+    const mockScrollIntoView = Element.prototype.scrollIntoView as jest.Mock;
+    mockScrollIntoView.mockClear();
+
+    render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+    const ttsButton = screen.getByTitle('Read Aloud');
+
+    // Start reading
+    act(() => {
+      ttsButton.click();
+      jest.advanceTimersByTime(100);
+    });
+
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    const utterance = utterances[0];
+
+    // Setup rects
+    jest.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList && this.classList.contains('readalong-content')) {
+        return { bottom: 100, top: 0, height: 100, left: 0, right: 100, width: 100, x: 0, y: 0, toJSON: () => { } } as DOMRect;
+      }
+      if (this.classList && this.classList.contains('active')) {
+        return { bottom: 120, top: 110, height: 20, left: 0, right: 50, width: 50, x: 0, y: 110, toJSON: () => { } } as DOMRect; // Below container (120 > 100)
+      }
+      return { bottom: 0, top: 0, height: 0, left: 0, right: 0, width: 0, x: 0, y: 0, toJSON: () => { } } as DOMRect;
+    });
+
+    // Trigger update
+    act(() => {
+      if (utterance.onboundary) utterance.onboundary({ name: 'word', charIndex: 0 }); // Word "Hello"
+    });
+
+    // Expect scrollIntoView
+    expect(mockScrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
   });
 });

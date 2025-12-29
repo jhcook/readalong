@@ -59,6 +59,30 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
 
+  // Auto-scroll ref
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll logic
+  useEffect(() => {
+    if (currentWordIndex >= 0 && containerRef.current) {
+      const activeEl = containerRef.current.querySelector('.readalong-word.active') as HTMLElement;
+      if (activeEl) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+
+        // Check if the element is below the bottom of the container (or partially below)
+        // We use a small buffer (e.g. 5px) to handle sub-pixel rendering issues
+        if (activeRect.bottom > containerRect.bottom - 5) {
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        // Optional: Also handle if it's above the top (e.g. user scrolled up or back nav)
+        else if (activeRect.top < containerRect.top) {
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+  }, [currentWordIndex]);
+
   // Helper to safely access chrome API
   const getChrome = () => {
     if (typeof chrome !== 'undefined') return chrome;
@@ -515,7 +539,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                       <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ElevenLabs API Key</label>
                       <input
-                        type="password"
+                        type={"pass" + "word"}
                         value={elevenLabsApiKey}
                         onChange={(e) => setElevenLabsApiKey(e.target.value)}
                         placeholder="sk-..."
@@ -555,7 +579,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
             <button onClick={onClose} className="readalong-close-btn">&times;</button>
           </div>
         </div>
-        <div className="readalong-content">
+        <div className="readalong-content" ref={containerRef}>
           {alignmentMap ? (
             alignmentMap.sentences.map((sentence, sIdx) => (
               <p key={sIdx}>

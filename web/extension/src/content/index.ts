@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ReadingPane from './ReadingPane';
-import { extractMainContent, sanitizeContent } from './extractor';
+import { extractMainContent, sanitizeContent, extractContentFromNode } from './extractor';
 import { setupTracing } from './tracing';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { tokenizeText } from './tokenizer';
@@ -126,7 +126,9 @@ function enableSelectionMode() {
     cleanup();
 
     // Process selected element
-    processAndMountContent(target.innerHTML);
+    // Use extractContentFromNode to handle Shadow DOM content that innerHTML misses
+    const html = extractContentFromNode(target);
+    processAndMountContent(html);
   };
 
   const onKeyDown = (e: KeyboardEvent) => {

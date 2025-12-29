@@ -36,7 +36,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Voice Preferences
-  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs' | 'google'>('system');
+  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs' | 'google' | 'record'>('system');
   const [systemVoiceURI, setSystemVoiceURI] = useState<string>('');
 
   // ElevenLabs State
@@ -328,8 +328,15 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       }
     }
     // 3. Recorded Audio
-    else if (recordedAudioUrl && voiceSource === 'system') {
-      provider = new RecordedProvider(recordedAudioUrl, alignmentMap);
+    else if (voiceSource === 'record') {
+      if (recordedAudioUrl) {
+        provider = new RecordedProvider(recordedAudioUrl, alignmentMap);
+      } else {
+        // If selected but no audio, maybe just do nothing or alert? 
+        // Realistically, user selects "Record" option to SEE the button, then records.
+        // If they play without recording, nothing happens or we could warn.
+        console.warn("Record source selected but no audio recorded yet.");
+      }
     }
     // 4. System TTS
     else {
@@ -461,6 +468,22 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     return null; // Or a loading spinner
   }
 
+  // Helper to determine active system voice for highlighting logic
+  const getActiveSystemVoice = () => {
+    if (voiceSource !== 'system') return null;
+    return voices.find(v => v.voiceURI === systemVoiceURI) ||
+      voices.find(v => v.localService && v.lang.startsWith('en')) ||
+      voices.find(v => v.name.includes('Google US English')) ||
+      voices.find(v => v.lang.startsWith('en'));
+  };
+
+  const activeSystemVoice = getActiveSystemVoice();
+  // Heuristic: Remote voices (like Google's) often don't send word boundaries.
+  // We check for localService === false OR 'Google' in the name as a fallback.
+  // Note: localService might be undefined in some browsers, so we check explicit false or name.
+  const isSentenceHighlightMode = voiceSource === 'system' && activeSystemVoice &&
+    (activeSystemVoice.localService === false || activeSystemVoice.name.includes('Google'));
+
   return (
     <div className={`readalong-overlay ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
       <div className="readalong-container">
@@ -515,9 +538,11 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
               </>
             )}
 
-            <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
-              {isRecording ? 'Stop' : 'Record'}
-            </button>
+            {voiceSource === 'record' && (
+              <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
+                {isRecording ? 'Stop' : 'Record'}
+              </button>
+            )}
 
             {/* Settings Toggle */}
             <button onClick={toggleSettings} className="readalong-control-btn" title="Settings">
@@ -555,12 +580,13 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                   <select
                     id="voice-source-select"
                     value={voiceSource}
-                    onChange={(e) => setVoiceSource(e.target.value as 'system' | 'elevenlabs')}
+                    onChange={(e) => setVoiceSource(e.target.value as 'system' | 'elevenlabs' | 'record')}
                     style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
                   >
                     <option value="system">System Voices</option>
                     <option value="elevenlabs">ElevenLabs</option>
                     <option value="google">Google Voices</option>
+                    <option value="record">Record</option>
                   </select>
                 </div>
 
@@ -677,7 +703,18 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
             alignmentMap.sentences.map((sentence, sIdx) => (
               <p key={sIdx}>
                 {sentence.words.map((word, wIdx) => {
-                  const isActive = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
+                  const isCurrentWord = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
+                  let isActive = isCurrentWord;
+
+                  // Fallback: If using a "dumb" voice (no word boundaries), highlight the whole sentence
+                  // if the current word pointer is anywhere in this sentence.
+                  if (isSentenceHighlightMode && currentWordIndex >= 0) {
+                    const currentGlobalWord = allWords[currentWordIndex];
+                    // Check if the word currently being spoken is part of this sentence
+                    if (sentence.words.includes(currentGlobalWord)) {
+                      isActive = true;
+                    }
+                  }
 
                   return (
                     <span

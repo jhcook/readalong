@@ -39,7 +39,7 @@
 2.  **High Contrast:** Click **"High Contrast"**. Verify the background turns black and text turns white.
 3.  **Persistence:** Close the overlay (click "X") or refresh the page. Re-open the extension. Verify your previous settings are preserved.
 
-### C. Voice Recording & Real-Time STT
+### C. Voice Recording & Playback
 1.  Click **"Record Voice"**.
 2.  Grant microphone permission if prompted.
 3.  **Verify:** The button turns red and pulses (CSS animation).
@@ -49,11 +49,25 @@
     *   `STT Result: ...` (with your transcribed text)
 6.  Click **"Stop Recording"**.
 7.  **Verify:** Console logs "Recording stopped, blob size: ...".
+8.  **Verify Playback:**
+    *   Open **Settings** (gear icon).
+    *   Select **"Record"** from the voice source dropdown.
+    *   Click **"Read Aloud"**.
+    *   **Verify:** You hear your recorded audio and the text highlights in sync.
 
-### D. Playback Simulation (Debug Mode)
-1.  Click **"Play Simulation"** (if available).
-2.  **Verify:** Words highlight sequentially in yellow.
-3.  Click **"Pause"**. Verify highlighting stops.
+### D. Text-to-Speech & Playback
+1.  **System Voices:**
+    *   Select **"System Voices"** in Settings.
+    *   Click **"Read Aloud"**.
+    *   **Verify:** Text is spoken by the browser's native TTS and highlights in sync.
+2.  **ElevenLabs (if configured):**
+    *   Select **"ElevenLabs"** in Settings (requires API Key).
+    *   Click **"Read Aloud"**.
+    *   **Verify:** High-quality audio plays and text highlights in sync.
+3.  **Controls:**
+    *   Click **"Pause"** to stop.
+    *   Click **"Play"** to resume.
+    *   Verify highlighting pauses and resumes correctly.
 
 ## 4. Running Automated Tests
 

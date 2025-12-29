@@ -48,9 +48,9 @@ This mode changes the color scheme to a black background with white text, provid
 **Persistence:**
 Your accessibility preferences are saved automatically. If you close the extension or reload the page, your last used font and contrast settings will be applied when you open ReadAlong again.
 
-## 4. Voice Recording
+## 4. Voice Recording & Playback
 
-Parents can record their own voice to be used for the read-along feature (functionality for playback and alignment coming soon).
+Parents or users can record their own voice to be used for the read-along feature.
 
 **How to use:**
 1. In the reading pane header, click the **"Record Voice"** button.
@@ -58,6 +58,9 @@ Parents can record their own voice to be used for the read-along feature (functi
 3. The button will turn red and pulse to indicate recording is in progress.
 4. Read the text aloud clearly.
 5. Click **"Stop Recording"** when finished.
-6. Check the browser console (Right-click > Inspect > Console) to see a confirmation that the recording blob has been created.
+6. To listen to your recording:
+    a. Click the **Settings** (gear) icon.
+    b. In the "Voice Source" dropdown, select **"Record"**.
+    c. Click **"Read Aloud"** (Play button) to hear your recording synchronized with the text.
 
-*Note: Currently, the recording is captured locally in the browser's memory for privacy. It is not yet saved to disk or processed.*
+*Note: Recordings are currently stored in your browser's memory for the current session.*

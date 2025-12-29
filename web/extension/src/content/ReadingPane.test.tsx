@@ -139,7 +139,15 @@ describe('ReadingPane', () => {
   it('handles recording start and stop, and shows audio playback', async () => {
     render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
 
-    const recordButton = screen.getByText('Record');
+    // 1. Select "Record" from settings first
+    const settingsButton = screen.getByTitle('Settings');
+    await act(async () => { settingsButton.click(); });
+
+    const sourceSelect = screen.getByDisplayValue('System Voices');
+    fireEvent.change(sourceSelect, { target: { value: 'record' } });
+
+    // Now record button should appear
+    const recordButton = screen.getByRole('button', { name: 'Record' });
 
     // Start Recording
     await act(async () => {
@@ -571,5 +579,68 @@ describe('ReadingPane', () => {
 
     // Expect scrollIntoView
     expect(mockScrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
+
+  it('hides Record button by default and shows when selected', async () => {
+    render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+    // 1. Verify hidden initially
+    expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument();
+
+    // 2. Open Settings
+    const settingsButton = screen.getByTitle('Settings');
+    await act(async () => { settingsButton.click(); });
+
+    // 3. Select "Record"
+    const sourceSelect = screen.getByDisplayValue('System Voices');
+    fireEvent.change(sourceSelect, { target: { value: 'record' } });
+
+    // 4. Verify visible
+    expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
+
+    // 5. Select "System Voices" again
+    fireEvent.change(sourceSelect, { target: { value: 'system' } });
+
+    // 6. Verify hidden again
+    expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument();
+  });
+
+  it('highlights entire sentence for Google system voices (fallback mode)', async () => {
+    // 1. Mock Google Voice
+    const googleVoice = { name: 'Google US English', lang: 'en-US', voiceURI: 'google-us', localService: false };
+    mockGetVoices.mockReturnValue([googleVoice]);
+
+    // 2. Render with setting pre-selected or select it
+    // We can rely on default selection logic in ReadingPane picking "Google US English" if it's the only one/best match.
+    // ReadingPane default voiceSource is 'system'.
+
+    render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+    // Wait for voice init
+    await act(async () => {
+      // trigger effect
+    });
+
+    // 3. Start Reading
+    const ttsButton = screen.getByTitle('Read Aloud');
+    act(() => {
+      ttsButton.click();
+      jest.advanceTimersByTime(100);
+    });
+
+    // 4. Trigger boundary for FIRST word "Hello" (index 0)
+    // In fallback mode, this should highlight "Hello" AND "World" (sentence 0)
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    const utterance = utterances[0];
+    act(() => {
+      if (utterance.onboundary) utterance.onboundary({ name: 'word', charIndex: 0 });
+    });
+
+    // 5. Verify Highlights
+    const helloWord = screen.getByText('Hello');
+    const worldWord = screen.getByText('world');
+
+    expect(helloWord).toHaveClass('active');
+    expect(worldWord).toHaveClass('active');
   });
 });

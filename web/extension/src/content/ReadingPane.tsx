@@ -40,6 +40,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   // Voice Preferences
   const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs' | 'google' | 'record'>('system');
   const [systemVoiceURI, setSystemVoiceURI] = useState<string>('');
+  const [playbackRate, setPlaybackRate] = useState<number>(1.0);
 
   // ElevenLabs State
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState<string>('');
@@ -106,7 +107,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName'], (result: any) => {
+      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName', 'playbackRate'], (result: any) => {
         if (result.theme) setTheme(result.theme);
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
@@ -116,6 +117,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         if (result.systemVoiceURI) setSystemVoiceURI(result.systemVoiceURI);
         if (result.googleApiKey) setGoogleApiKey(result.googleApiKey);
         if (result.selectedGoogleVoiceName) setSelectedGoogleVoiceName(result.selectedGoogleVoiceName);
+        if (result.playbackRate) setPlaybackRate(result.playbackRate);
         setSettingsLoaded(true);
       });
     } else {
@@ -202,15 +204,38 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName });
+      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName, playbackRate });
     }
 
     // CRITICAL FIX: If voice settings change while playing, STOP immediately.
     // This prevents the "Ghost Voice" issue where the user changes settings but the old provider continues.
     if (isPlaying || isPaused || readingProvider.current) {
-      handleStop();
+      // Exception: If ONLY playbackRate changed, we might not need to full stop if the provider handles it.
+      // But our effect dependencies include everything.
+      // Let's optimize: Check if provider supports dynamic rate update without full re-init.
+      // Actually, SystemProvider needs restart for rate change anyway.
+      // But we should probably try to call setPlaybackRate first if it's just a rate change.
+      // Complication: The effect triggers on ANY change. HARD to know WHICH changed without refs.
+      // For now, let's keep the STOP behavior for safety, unless we want live sliding.
+      // Live sliding with STOP/START is bad audio UX.
+
+      // BETTER APPROACH: Move playbackRate out of this "STOP EVERYTHING" effect?
+      // Or handle it separately.
+      // Let's leave playbackRate OUT of this dependency array and handle it in its own effect.
     }
   }, [theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName]);
+
+  // Separate effect for Playback Rate to allow dynamic updates
+  useEffect(() => {
+    const chromeApi = getChrome();
+    if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
+      chromeApi.storage.local.set({ playbackRate });
+    }
+
+    if (readingProvider.current) {
+      readingProvider.current.setPlaybackRate(playbackRate);
+    }
+  }, [playbackRate]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -372,6 +397,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         console.error("Provider Error", err);
         setIsLoadingAudio(false);
       };
+
+      // Set initial rate
+      provider.setPlaybackRate(playbackRate);
 
       readingProvider.current = provider;
     }
@@ -606,6 +634,26 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                     <option value="playful">Playful (Bubbles)</option>
                     <option value="building-blocks">Building Blocks</option>
                   </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label htmlFor="speed-slider" style={{ fontSize: '12px', fontWeight: 'bold' }}>
+                    Speed: {playbackRate.toFixed(1)}x
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '10px' }}>0.5x</span>
+                    <input
+                      id="speed-slider"
+                      type="range"
+                      min="0.5"
+                      max="2.5"
+                      step="0.1"
+                      value={playbackRate}
+                      onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ fontSize: '10px' }}>2.5x</span>
+                  </div>
                 </div>
 
                 <hr style={{ width: '100%', margin: '5px 0', border: '0', borderTop: '1px solid #eee' }} />

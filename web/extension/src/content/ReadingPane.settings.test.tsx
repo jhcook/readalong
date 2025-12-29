@@ -312,4 +312,26 @@ describe('ReadingPane Settings & Fallback', () => {
         expect(wrapper).toHaveClass('theme-building-blocks');
     });
 
+    it('updates playbackRate when slider changes', async () => {
+        mockGet.mockImplementation((keys, callback) => callback({})); // Default 1.0
+
+        render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+        await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+        // Open Settings
+        const settingsButton = screen.getByTitle('Settings');
+        act(() => { settingsButton.click(); });
+
+        // Change Speed
+        const slider = screen.getByLabelText(/Speed:/); // Matches "Speed: 1.0x"
+        fireEvent.change(slider, { target: { value: '1.5' } });
+
+        await waitFor(() => {
+            expect(mockSet).toHaveBeenCalled();
+        });
+
+        expect(mockSet.mock.calls[0][0]).toMatchObject({ playbackRate: 1.5 });
+    });
+
 });

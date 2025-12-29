@@ -16,6 +16,8 @@ export class SystemProvider implements ReadingProvider {
     onError?: (error: string) => void;
 
     private isPaused = false;
+    private rate: number = 1.0;
+    private currentSentenceIndex: number = -1;
 
     constructor(alignmentMap: AlignmentMap) {
         this.alignmentMap = alignmentMap;
@@ -54,6 +56,7 @@ export class SystemProvider implements ReadingProvider {
             if (this.voice) {
                 utterance.voice = this.voice;
             }
+            utterance.rate = this.rate;
 
             // Capture current offset for closure
             const currentSentenceOffset = globalWordOffset;
@@ -73,6 +76,7 @@ export class SystemProvider implements ReadingProvider {
             };
 
             utterance.onstart = () => {
+                this.currentSentenceIndex = currentSentenceIndex; // Track for restart
                 // If it's the very first utterance we are playing (not necessarily the first in doc)
                 // but effectively we might want to signal sentence boundary?
                 if (this.onSentenceBoundary) {
@@ -135,9 +139,19 @@ export class SystemProvider implements ReadingProvider {
     }
 
     setPlaybackRate(rate: number): void {
-        // SpeechSynthesisUtterance rate can't be changed mid-speak easily on all browsers without restart.
-        // For now, ignorable or requires restart.
-        // Chrome allows modifying utterance.rate but not while speaking? 
-        // Typically requires canceling and restarting.
+        this.rate = rate; // Store new rate
+
+        // If currently speaking, we need to restart to apply the rate change?
+        // SpeechSynthesisUtterance rate cannot be changed while speaking on most browsers.
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            // We need to know where we are to restart. 
+            // We don't easily track the *current* sentence index inside the loop unless we track it.
+            // But we do listen to 'onstart' which gives us the sort-of current index?
+            // Actually, 'onstart' fires when an utterance starts. 
+            // If we track the last started sentence index, we can restart from there.
+            if (this.currentSentenceIndex !== -1) {
+                this.play(this.currentSentenceIndex);
+            }
+        }
     }
 }

@@ -18,7 +18,8 @@ function mountReadingPane(text: string, alignmentMap?: AlignmentMap) {
 
   rootElement = document.createElement('div');
   rootElement.id = 'readalong-root';
-  document.body.appendChild(rootElement);
+  // Use documentElement to avoid conflicts with body observers (e.g. Popup Maker)
+  document.documentElement.appendChild(rootElement);
 
   shadowRoot = rootElement.attachShadow({ mode: 'open' });
 
@@ -36,7 +37,9 @@ function mountReadingPane(text: string, alignmentMap?: AlignmentMap) {
   const handleClose = () => {
     root.unmount();
     if (rootElement) {
-      document.body.removeChild(rootElement);
+      if (rootElement.parentNode) {
+        rootElement.parentNode.removeChild(rootElement);
+      }
       rootElement = null;
       shadowRoot = null;
     }

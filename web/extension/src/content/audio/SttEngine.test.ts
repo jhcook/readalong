@@ -1,10 +1,4 @@
 import { SttEngine } from './SttEngine';
-import { createModel } from 'vosk-browser';
-
-// Mock vosk-browser
-jest.mock('vosk-browser', () => ({
-    createModel: jest.fn(),
-}));
 
 // Mock AudioContext and related
 const mockConnect = jest.fn();
@@ -14,7 +8,7 @@ const mockClose = jest.fn();
 
 class MockAudioWorkletNode {
     port = {
-        onmessage: null,
+        onmessage: null as ((event: any) => void) | null,
         postMessage: jest.fn(),
     };
     connect = mockConnect;
@@ -28,68 +22,62 @@ class MockMediaStreamAudioSourceNode {
 
 global.AudioWorkletNode = MockAudioWorkletNode as any;
 
-const mockCreateBuffer = jest.fn().mockImplementation((channels, length, sampleRate) => ({
-    copyToChannel: jest.fn(),
-    numberOfChannels: channels,
-    length: length,
-    sampleRate: sampleRate,
-    getChannelData: jest.fn(), // If needed by other tests
-}));
-
 const MockAudioContext = jest.fn().mockImplementation(() => ({
     audioWorklet: {
         addModule: mockAddModule,
     },
     createMediaStreamSource: jest.fn(() => new MockMediaStreamAudioSourceNode()),
-    createBuffer: mockCreateBuffer,
     sampleRate: 44100,
     destination: {},
     close: mockClose,
-    // ...
 }));
 
-
-
 global.AudioContext = MockAudioContext as any;
-global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    clone: jest.fn(),
-    blob: jest.fn().mockResolvedValue(new Blob([])),
-}) as any;
-
-if (typeof URL.createObjectURL === 'undefined') {
-    Object.defineProperty(URL, 'createObjectURL', { value: jest.fn() });
-} else {
-    URL.createObjectURL = jest.fn();
-}
-
-const mockCache = {
-    match: jest.fn(),
-    put: jest.fn(),
-};
-
-global.caches = {
-    open: jest.fn().mockResolvedValue(mockCache),
-} as any;
 
 describe('SttEngine', () => {
     let engine: SttEngine;
-    let mockAcceptWaveform: jest.Mock;
-    let mockAcceptWaveformFloat: jest.Mock;
+    let originalCreateElement: any;
+    let originalAddEventListener: any;
+    let originalRemoveEventListener: any;
+    let messageHandler: ((event: any) => void) | null = null;
+    let capturedIframe: HTMLIFrameElement | null = null;
+    let mockPostMessage: jest.Mock;
 
     beforeEach(() => {
         engine = new SttEngine();
-        mockAcceptWaveform = jest.fn();
-        mockAcceptWaveformFloat = jest.fn();
-        (createModel as jest.Mock).mockResolvedValue({
-            KaldiRecognizer: jest.fn().mockImplementation(() => ({
-                setWords: jest.fn(),
-                on: jest.fn(),
-                acceptWaveform: mockAcceptWaveform,
-                acceptWaveformFloat: mockAcceptWaveformFloat,
-                remove: jest.fn(),
-            })),
-            terminate: jest.fn(),
+        mockPostMessage = jest.fn();
+        capturedIframe = null;
+
+        // Spy on createElement
+        originalCreateElement = document.createElement;
+        jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+            const el = originalCreateElement.call(document, tagName, options);
+            if (tagName === 'iframe') {
+                capturedIframe = el as HTMLIFrameElement;
+                // Mock contentWindow
+                Object.defineProperty(el, 'contentWindow', {
+                    value: {
+                        postMessage: mockPostMessage,
+                    },
+                    writable: true
+                });
+            }
+            return el;
+        });
+
+        // Spy on window.addEventListener
+        originalAddEventListener = window.addEventListener;
+        jest.spyOn(window, 'addEventListener').mockImplementation((type, handler) => {
+            if (type === 'message') {
+                messageHandler = handler as any;
+            }
+        });
+
+        originalRemoveEventListener = window.removeEventListener;
+        jest.spyOn(window, 'removeEventListener').mockImplementation((type, handler) => {
+            if (type === 'message' && handler === messageHandler) {
+                messageHandler = null;
+            }
         });
 
         // Mock chrome.runtime.getURL
@@ -101,77 +89,98 @@ describe('SttEngine', () => {
     });
 
     afterEach(() => {
-        jest.clearAllMocks();
+        jest.restoreAllMocks();
+        mockPostMessage.mockClear();
+        mockConnect.mockClear();
+        mockDisconnect.mockClear();
+        mockClose.mockClear();
+        if (capturedIframe && capturedIframe.parentNode) {
+            capturedIframe.parentNode.removeChild(capturedIframe);
+        }
     });
 
-    it('should initialize successfully (model only)', async () => {
-        await engine.initialize();
-        expect(createModel).toHaveBeenCalled();
-        // Recognizer is not created yet
-        const model = await createModel('');
-        expect(model.KaldiRecognizer).not.toHaveBeenCalled();
+    const triggerIframeLoad = () => {
+        if (capturedIframe) {
+            // SttEngine sets direct .onload property
+            if (capturedIframe.onload) {
+                (capturedIframe.onload as any)(new Event('load'));
+            }
+        }
+    };
+
+    it('should initialize successfully (create iframe)', async () => {
+        const initPromise = engine.initialize();
+
+        // Wait for microtask or force sync? SttEngine awaits generic Promise around onload.
+        // We need to trigger onload.
+        setTimeout(triggerIframeLoad, 0);
+
+        await initPromise;
+
+        expect(document.createElement).toHaveBeenCalledWith('iframe');
+        expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'INITIALIZE'
+        }), '*');
     });
 
-    it('should start audio processing and create recognizer with correct sample rate', async () => {
+    it('should start audio processing and forward audio to sandbox', async () => {
         const stream = {} as MediaStream;
+
+        const initPromise = engine.initialize();
+        setTimeout(triggerIframeLoad, 0);
+        await initPromise;
+        mockPostMessage.mockClear();
+
         await engine.start(stream);
+
         expect(mockAddModule).toHaveBeenCalledWith('audio-processor.js');
         expect(global.AudioContext).toHaveBeenCalled();
 
-        // Verify recognizer creation with correct sample rate (44100 from mock)
-        const model = await createModel('');
-        expect(model.KaldiRecognizer).toHaveBeenCalledWith(44100);
-    });
-
-    it('should handle audio data from worklet', async () => {
-        const stream = {} as MediaStream;
-        await engine.start(stream);
-
-        // Access the worklet node that was created
-        // We can't access private property easily, but we know usage.
-        // We know SttEngine sets onmessage.
-        // But in our mock, we need to trigger it.
-        // The MockAudioWorkletNode is instantiated inside start().
-        // We need to capture the instance or just the onmessage handler.
-        // Since AudioWorkletNode is mocked globally, we can spy on it or its instances?
-        // Actually, we can just grab the getLastInstance if we had a way, or...
-        // Wait, SttEngine creates `this.workletNode`. It assigns `this.workletNode.port.onmessage`.
-        // Our MockAudioWorkletNode has `port = { onmessage: null ... }`.
-
-        // Let's use a spy on AudioWorkletNode constructor to get the instance?
-        // Or simpler: verify mockCreateBuffer implies flow worked?
-
-        // We need to simulate the message event.
-        // Using a spy on the constructor is cleaner maybe?
-
-        // Better yet:
-        // We can inspect the implementation of SttEngine to see it assigns onmessage.
-        // But SttEngine is the SUT (System Under Test).
-
-        // Let's modify the Global MockAudioWorkletNode to store instances we can access in test?
-        // Or simpler: we can't easily access the private `workletNode` property of `engine`.
-        // But we can cast engine to any.
-
+        // Trigger onmessage on worklet node
         const workletNode = (engine as any).workletNode;
         expect(workletNode).toBeDefined();
-        expect(workletNode.port.onmessage).toBeDefined();
 
         const float32Data = new Float32Array([0.1, 0.2, 0.3]);
         workletNode.port.onmessage({ data: float32Data });
 
+        expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'PROCESS_AUDIO',
+            data: float32Data
+        }), '*');
+    });
 
-        expect(mockAcceptWaveform).toHaveBeenCalledWith(expect.objectContaining({
-            sampleRate: 44100,
-            length: float32Data.length,
-            numberOfChannels: 1,
-            copyToChannel: expect.any(Function),
-        }));
+    it('should dispatch stt-result event on message from sandbox', async () => {
+        const initPromise = engine.initialize();
+        setTimeout(triggerIframeLoad, 0);
+        await initPromise;
+
+        const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+        if (messageHandler && capturedIframe) {
+            messageHandler({
+                source: capturedIframe.contentWindow,
+                data: {
+                    type: 'STT_RESULT',
+                    result: { text: 'hello world' }
+                }
+            });
+        }
+
+        expect(dispatchSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
+        const event = dispatchSpy.mock.calls[0][0] as CustomEvent;
+        expect(event.type).toBe('stt-result');
+        expect(event.detail).toEqual({ text: 'hello world' });
     });
 
     it('should stop audio processing', async () => {
         const stream = {} as MediaStream;
+        const initPromise = engine.initialize();
+        setTimeout(triggerIframeLoad, 0);
+        await initPromise;
+
         await engine.start(stream);
         engine.stop();
+
         expect(mockDisconnect).toHaveBeenCalled();
         expect(mockClose).toHaveBeenCalled();
     });

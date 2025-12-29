@@ -73,9 +73,9 @@ describe('ElevenLabsClient', () => {
     });
 
     describe('generateAudio', () => {
-        it('resolves with audio data url', async () => {
-            const audioData = 'data:audio/mpeg;base64,abc';
-            const messageResponse = { success: true, audioData };
+        it('resolves with audio id', async () => {
+            const audioId = 'abcd-1234';
+            const messageResponse = { success: true, audioId };
 
             chrome.runtime.sendMessage.mockImplementation(((message, callback) => {
                 expect(message).toEqual({
@@ -89,7 +89,7 @@ describe('ElevenLabsClient', () => {
 
             const result = await ElevenLabsClient.generateAudio('key', 'vid', 'hello');
             expect(result).toEqual({
-                audioData: audioData,
+                audioId: audioId,
                 alignment: undefined
             });
         });

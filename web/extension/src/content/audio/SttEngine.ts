@@ -1,4 +1,3 @@
-import { createModel, KaldiRecognizer, Model } from 'vosk-browser';
 import { trace } from '@opentelemetry/api';
 
 export interface TranscriptionResult {
@@ -12,15 +11,14 @@ export interface TranscriptionResult {
 }
 
 export class SttEngine {
-  private model: Model | null = null;
-  private recognizer: KaldiRecognizer | null = null;
   private audioContext: AudioContext | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
+  private sandboxFrame: HTMLIFrameElement | null = null;
+  private isInitialized = false;
 
   // Placeholder URL - in a real app, you'd bundle a small model or download it
   private modelUrl = 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz';
-  private sampleRate = 16000;
 
   constructor(modelUrl?: string) {
     if (modelUrl) {
@@ -31,50 +29,38 @@ export class SttEngine {
   async initialize(): Promise<void> {
     const tracer = trace.getTracer('readalong-extension');
     return tracer.startActiveSpan('SttEngine.initialize', async (span) => {
-      if (this.model) {
+      if (this.isInitialized && this.sandboxFrame) {
         span.end();
         return;
       }
 
       try {
-        // Caching logic
-        const cacheName = 'readalong-models-v1';
-        const cache = await caches.open(cacheName);
-        let response = await cache.match(this.modelUrl);
-        let modelSource: string | Blob = this.modelUrl;
+        // Create hidden iframe for sandbox
+        this.sandboxFrame = document.createElement('iframe');
+        this.sandboxFrame.style.display = 'none';
+        this.sandboxFrame.src = chrome.runtime.getURL('sandbox.html');
+        document.body.appendChild(this.sandboxFrame);
 
-        if (!response) {
-          try {
-            // If we are online, fetch and cache
-            if (navigator.onLine) {
-              response = await fetch(this.modelUrl);
-              if (response.ok) {
-                cache.put(this.modelUrl, response.clone());
-                cache.put(this.modelUrl, response.clone());
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to fetch/cache model:', e);
+        // Wait for iframe to load? 
+        // We can listen for an INITIALIZED message or just wait for onload.
+        await new Promise<void>((resolve) => {
+          if (this.sandboxFrame) {
+            this.sandboxFrame.onload = () => resolve();
           }
-        }
+        });
 
-        if (response) {
-          modelSource = await response.blob();
-        }
+        // Setup message listener
+        window.addEventListener('message', this.handleSandboxMessage);
 
-        // Create the model - this spawns a web worker
-        // createModel can accept a URL string or a Blob/File if passing a path isn't possible?
-        // vosk-browser createModel signature: (modelUrl: string, logLevel?: number) => Promise<Model>
-        // Wait, the types say `modelUrl: string`. 
-        // Does it support object URLs? Yes, usually.
+        // Send initialization command
+        this.sandboxFrame.contentWindow?.postMessage({
+          type: 'INITIALIZE',
+          modelUrl: this.modelUrl
+        }, '*');
 
-        if (modelSource instanceof Blob) {
-          modelSource = URL.createObjectURL(modelSource);
-        }
-
-        this.model = await createModel(modelSource);
-
-        // Recognizer creation is now deferred to start() to allow dynamic sample rate usage
+        // Wait for confirmation?
+        // Let's assume initialized for now or track state via message
+        this.isInitialized = true;
 
       } catch (error) {
         console.error('Failed to initialize SttEngine:', error);
@@ -87,11 +73,27 @@ export class SttEngine {
     });
   }
 
+  private handleSandboxMessage = (event: MessageEvent) => {
+    // Security check: ensure origin? 
+    // Extensions are tricky, but checking if source matches our iframe contentWindow is good.
+    if (event.source !== this.sandboxFrame?.contentWindow) return;
+
+    const { type, result, error } = event.data;
+
+    if (type === 'STT_RESULT') {
+      window.dispatchEvent(new CustomEvent('stt-result', { detail: result }));
+    } else if (type === 'STT_PARTIAL') {
+      window.dispatchEvent(new CustomEvent('stt-partial', { detail: result }));
+    } else if (type === 'ERROR') {
+      console.error('[SttEngine] Sandbox error:', error);
+    }
+  };
+
   async start(stream: MediaStream): Promise<void> {
     const tracer = trace.getTracer('readalong-extension');
     return tracer.startActiveSpan('SttEngine.start', async (span) => {
       try {
-        if (!this.model || !this.recognizer) {
+        if (!this.isInitialized || !this.sandboxFrame) {
           await this.initialize();
         }
 
@@ -99,41 +101,27 @@ export class SttEngine {
         await this.audioContext.audioWorklet.addModule(chrome.runtime.getURL('audio-processor.js'));
         this.source = this.audioContext.createMediaStreamSource(stream);
 
-        // Initialize recognizer with the correct sample rate from the AudioContext
-        if (this.recognizer) {
-          this.recognizer.remove();
-        }
-        this.recognizer = new this.model!.KaldiRecognizer(this.audioContext.sampleRate);
-        this.recognizer.setWords(true);
-        this.recognizer.on("result", (message: any) => {
-          const event = new CustomEvent('stt-result', { detail: message.result });
-          window.dispatchEvent(event);
-        });
-        this.recognizer.on("partialresult", (message: any) => {
-          const event = new CustomEvent('stt-partial', { detail: message.result });
-          window.dispatchEvent(event);
-        });
+        // Send Sample Rate to Sandbox?
+        // Actually the sandbox might need to create a recognizer with specific sample rate.
+        // We do that lazily in sandbox's PROCESS_AUDIO or sends a CONFIG message.
+        // For now, let's assume sandbox handles it on first data or we can assume standard 16k/44.1k
+        // The sandbox.ts logic currently initializes recognizer on first chunk using passed sampleRate.
 
         this.workletNode = new AudioWorkletNode(this.audioContext, 'stt-processor');
 
         this.workletNode.port.onmessage = (event) => {
           try {
-            if (this.recognizer && this.audioContext) {
-              const float32Data = event.data as unknown as Float32Array;
-
-              // Use a real AudioBuffer to ensure compatibility with vosk-browser's checks
-              // This resolves "TypeError: U.getChannelData is not a function"
-              const audioBuffer = this.audioContext.createBuffer(
-                1,
-                float32Data.length,
-                this.audioContext.sampleRate
-              );
-              audioBuffer.copyToChannel(float32Data as any, 0);
-
-              this.recognizer.acceptWaveform(audioBuffer);
+            const float32Data = event.data; // Should be Float32Array
+            // Send to sandbox
+            if (this.sandboxFrame?.contentWindow) {
+              this.sandboxFrame.contentWindow.postMessage({
+                type: 'PROCESS_AUDIO',
+                data: float32Data, // Structured clone should handle this efficiently
+                sampleRate: this.audioContext?.sampleRate || 48000
+              }, '*');
             }
           } catch (error) {
-            console.error('acceptWaveform failed', error);
+            console.error('Failed to forward audio to sandbox', error);
           }
         };
 
@@ -167,13 +155,18 @@ export class SttEngine {
 
   terminate(): void {
     this.stop();
-    if (this.recognizer) {
-      this.recognizer.remove();
-      this.recognizer = null;
+    window.removeEventListener('message', this.handleSandboxMessage);
+
+    if (this.sandboxFrame) {
+      this.sandboxFrame.contentWindow?.postMessage({ type: 'TERMINATE' }, '*');
+      // Give it a moment? Then remove.
+      setTimeout(() => {
+        if (this.sandboxFrame && this.sandboxFrame.parentNode) {
+          this.sandboxFrame.parentNode.removeChild(this.sandboxFrame);
+        }
+        this.sandboxFrame = null;
+      }, 100);
     }
-    if (this.model) {
-      this.model.terminate();
-      this.model = null;
-    }
+    this.isInitialized = false;
   }
 }

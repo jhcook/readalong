@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import ReadingPane from './ReadingPane';
@@ -7,7 +8,8 @@ import { ElevenLabsClient } from './services/ElevenLabsClient';
 // Mock dependencies
 jest.mock('./audio/AudioRecorder', () => ({
     AudioRecorder: jest.fn().mockImplementation(() => ({
-        start: jest.fn(),
+        prepare: jest.fn().mockResolvedValue({}),
+        startRecording: jest.fn(),
         stop: jest.fn(),
         isRecording: jest.fn().mockReturnValue(false)
     }))
@@ -75,6 +77,61 @@ class MockSpeechSynthesisUtterance {
 }
 global.SpeechSynthesisUtterance = MockSpeechSynthesisUtterance as any;
 
+// Mock Audio
+const mockAudioInstances: any[] = [];
+class MockAudio {
+    src: string = '';
+    currentTime: number = 0;
+    playbackRate: number = 1;
+    paused: boolean = true;
+    error: any = null;
+
+    _listeners: Record<string, Function[]> = {};
+
+    constructor(src?: string) {
+        if (src) this.src = src;
+        mockAudioInstances.push(this);
+    }
+
+    play() {
+        this.paused = false;
+        // Trigger play event
+        this._trigger('play');
+        return Promise.resolve();
+    }
+
+    pause() {
+        this.paused = true;
+        this._trigger('pause');
+    }
+
+    addEventListener(event: string, handler: Function) {
+        if (!this._listeners[event]) this._listeners[event] = [];
+        this._listeners[event].push(handler);
+    }
+
+    removeEventListener(event: string, handler: Function) {
+        if (this._listeners[event]) {
+            this._listeners[event] = this._listeners[event].filter(h => h !== handler);
+        }
+    }
+
+    removeAttribute(attr: string) {
+        if (attr === 'src') this.src = '';
+    }
+
+    load() { }
+
+    // Helper to simulate events
+    _trigger(event: string, data?: any) {
+        if (this._listeners[event]) {
+            this._listeners[event].forEach(h => h(data || { target: this, currentTarget: this }));
+        }
+    }
+}
+(window as any).Audio = MockAudio;
+
+
 const mockAlignmentMap: AlignmentMap = {
     fullText: "Hello world",
     sentences: [
@@ -92,8 +149,9 @@ const mockAlignmentMap: AlignmentMap = {
 describe('ReadingPane Synchronization', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockAudioInstances.length = 0;
         // Reset chrome mock
-        (global as any).chrome = {
+        const mockChrome = {
             storage: {
                 local: {
                     get: jest.fn((keys, cb) => cb({})),
@@ -101,9 +159,29 @@ describe('ReadingPane Synchronization', () => {
                 }
             },
             runtime: {
-                sendMessage: jest.fn()
+                sendMessage: jest.fn((msg, cb) => {
+                    if (!cb) return;
+
+                    if (msg.type === 'PLAY_AUDIO') {
+                        // Simulate failure to force fallback
+                        cb({ success: false, error: "Force fallback" });
+                    } else if (msg.type === 'FETCH_AUDIO') {
+                        // Return dummy base64
+                        cb({ success: true, audioData: "data:audio/mp3;base64,mockdata" });
+                    } else if (msg.type === 'GENERATE_AUDIO') {
+                        cb({ success: true, audioId: 'mock-audio', alignment: {} });
+                    } else {
+                        cb({ success: true });
+                    }
+                }),
+                onMessage: {
+                    addListener: jest.fn(),
+                    removeListener: jest.fn()
+                }
             }
         };
+        (global as any).chrome = mockChrome;
+        (window as any).chrome = mockChrome;
     });
 
     it('Syncs TTS highlighting using onboundary events', async () => {
@@ -112,6 +190,11 @@ describe('ReadingPane Synchronization', () => {
         const ttsButton = screen.getByTitle('Read Aloud');
         act(() => {
             ttsButton.click();
+        });
+
+        // Wait for voices to load and init
+        await waitFor(() => {
+            expect(mockSpeak).toHaveBeenCalled();
         });
 
         const utterance = (mockSpeak.mock.calls[0][0] as MockSpeechSynthesisUtterance);
@@ -153,21 +236,10 @@ describe('ReadingPane Synchronization', () => {
             alignment: {
                 characters: ['H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd'],
                 character_start_times_seconds: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1],
-                character_end_times_seconds: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
             }
         });
 
-        // Create a mock Audio element
-        const pauseStub = jest.fn();
-        const playStub = jest.fn().mockResolvedValue(undefined);
-
-        /* eslint-disable-next-line */
-        window.HTMLMediaElement.prototype.play = playStub;
-        window.HTMLMediaElement.prototype.pause = pauseStub;
-
         render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
-
-        // Open settings (to trigger setting usage if needed, though we mocked storage)
 
         const ttsButton = await screen.findByTitle('Read Aloud'); // Wait for initial render
 
@@ -175,18 +247,19 @@ describe('ReadingPane Synchronization', () => {
             ttsButton.click();
         });
 
-        expect(ElevenLabsClient.generateAudio).toHaveBeenCalled();
+        await waitFor(() => {
+            expect(ElevenLabsClient.generateAudio).toHaveBeenCalled();
+        });
+
+        // Find captured audio instance
+        expect(mockAudioInstances.length).toBeGreaterThan(0);
+        const audioInstance = mockAudioInstances[0];
 
         // Simulate time update on the Audio element
-        // Since the Audio element is rendered conditionally *after* audio is set, we need to find it.
-        // It's hidden, so getByRole might not find it easily, but we can querySelector.
-
-        const audioElement = document.querySelector('audio');
-        expect(audioElement).toBeInTheDocument();
-
         // Time 0.1 -> 'H' -> Index 0 ("Hello")
         act(() => {
-            fireEvent.timeUpdate(audioElement!, { target: { currentTime: 0.15 } });
+            audioInstance.currentTime = 0.15;
+            audioInstance._trigger('timeupdate');
         });
 
         expect(screen.getByText('Hello')).toHaveClass('active');
@@ -194,7 +267,8 @@ describe('ReadingPane Synchronization', () => {
 
         // Time 0.8 -> 'o' (in world) -> Index 1 ("world")
         act(() => {
-            fireEvent.timeUpdate(audioElement!, { target: { currentTime: 0.85 } });
+            audioInstance.currentTime = 0.85;
+            audioInstance._trigger('timeupdate');
         });
 
         expect(screen.getByText('world')).toHaveClass('active');

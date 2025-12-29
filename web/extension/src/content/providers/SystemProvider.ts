@@ -1,0 +1,143 @@
+
+import { ReadingProvider } from './ReadingProvider';
+import { AlignmentMap, Word } from '../types';
+import { buildTextAndMap } from '../utils/textUtils';
+
+export class SystemProvider implements ReadingProvider {
+    private alignmentMap: AlignmentMap;
+    private allWords: Word[];
+    private utterances: SpeechSynthesisUtterance[] = [];
+    private voice: SpeechSynthesisVoice | null = null;
+
+    // Callback placeholders
+    onWordBoundary?: (globalWordIndex: number) => void;
+    onSentenceBoundary?: (sentenceIndex: number) => void;
+    onStateChange?: (isPlaying: boolean, isLoading: boolean) => void;
+    onError?: (error: string) => void;
+
+    private isPaused = false;
+
+    constructor(alignmentMap: AlignmentMap) {
+        this.alignmentMap = alignmentMap;
+        this.allWords = alignmentMap.sentences.flatMap(s => s.words);
+    }
+
+    setVoice(voice: SpeechSynthesisVoice | null) {
+        this.voice = voice;
+    }
+
+    async play(startSentenceIndex: number): Promise<void> {
+        this.stop();
+        this.isPaused = false;
+
+        if (this.onStateChange) this.onStateChange(true, false);
+
+        const sentences = this.alignmentMap.sentences;
+        if (!sentences || sentences.length === 0) return;
+
+        // Calculate global offsets up to startSentenceIndex
+        let globalWordOffset = 0;
+        for (let i = 0; i < startSentenceIndex; i++) {
+            globalWordOffset += sentences[i].words.length;
+        }
+
+        const newUtterances: SpeechSynthesisUtterance[] = [];
+
+        // We iterate starting from the exact sentence index requested
+        for (let i = startSentenceIndex; i < sentences.length; i++) {
+            const sentence = sentences[i];
+            if (sentence.words.length === 0) continue;
+
+            const { text, map } = buildTextAndMap(sentence.words);
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            if (this.voice) {
+                utterance.voice = this.voice;
+            }
+
+            // Capture current offset for closure
+            const currentSentenceOffset = globalWordOffset;
+            const currentSentenceIndex = i;
+
+            utterance.onboundary = (event) => {
+                if (event.name === 'word') {
+                    const charIndex = event.charIndex;
+                    const localWordIndex = map[charIndex];
+                    if (localWordIndex !== undefined) {
+                        const globalIndex = currentSentenceOffset + localWordIndex;
+                        if (this.onWordBoundary) {
+                            this.onWordBoundary(globalIndex);
+                        }
+                    }
+                }
+            };
+
+            utterance.onstart = () => {
+                // If it's the very first utterance we are playing (not necessarily the first in doc)
+                // but effectively we might want to signal sentence boundary?
+                if (this.onSentenceBoundary) {
+                    this.onSentenceBoundary(currentSentenceIndex);
+                }
+                // Legacy behavior: Highlight first word immediately
+                if (this.onWordBoundary) {
+                    // Find global index of first word in this sentence
+                    // We know currentSentenceOffset is global word offset
+                    this.onWordBoundary(currentSentenceOffset);
+                }
+            };
+
+            utterance.onend = () => {
+                // Check if this was the last utterance
+                if (i === sentences.length - 1) {
+                    if (this.onStateChange) this.onStateChange(false, false);
+                }
+            }
+
+            utterance.onerror = (e) => {
+                if (e.error !== 'canceled' && e.error !== 'interrupted') {
+                    console.error('SystemProvider TTS error', e);
+                    if (this.onError) this.onError(e.error);
+                }
+            }
+
+            newUtterances.push(utterance);
+            globalWordOffset += sentence.words.length;
+        }
+
+        this.utterances = newUtterances;
+
+        if (newUtterances.length > 0) {
+            newUtterances.forEach(u => window.speechSynthesis.speak(u));
+        } else {
+            if (this.onStateChange) this.onStateChange(false, false);
+        }
+    }
+
+    pause(): void {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            window.speechSynthesis.pause();
+            this.isPaused = true;
+        }
+    }
+
+    resume(): void {
+        if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+            this.isPaused = false;
+        }
+    }
+
+    stop(): void {
+        window.speechSynthesis.cancel();
+        this.utterances = [];
+        this.isPaused = false;
+        if (this.onStateChange) this.onStateChange(false, false);
+    }
+
+    setPlaybackRate(rate: number): void {
+        // SpeechSynthesisUtterance rate can't be changed mid-speak easily on all browsers without restart.
+        // For now, ignorable or requires restart.
+        // Chrome allows modifying utterance.rate but not while speaking? 
+        // Typically requires canceling and restarting.
+    }
+}

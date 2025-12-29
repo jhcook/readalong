@@ -6,16 +6,23 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "offscreen"
   ],
   "action": {
     "default_popup": "popup.html"
+  },
+  "sandbox": {
+    "pages": [
+      "sandbox.html"
+    ]
   },
   "background": {
     "service_worker": "background.js"
   },
   "host_permissions": [
-    "https://api.elevenlabs.io/*"
+    "https://api.elevenlabs.io/*",
+    "https://ccoreilly.github.io/*"
   ],
   "content_scripts": [
     {
@@ -31,11 +38,15 @@
     {
       "resources": [
         "styles.css",
-        "audio-processor.js"
+        "audio-processor.js",
+        "sandbox.html"
       ],
       "matches": [
         "<all_urls>"
       ]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; media-src 'self' data: https:;"
+  }
 }

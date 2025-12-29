@@ -6,6 +6,8 @@ module.exports = {
     popup: './src/popup/index.tsx',
     content: './src/content/index.ts',
     background: './src/background/index.ts',
+    offscreen: './src/offscreen/offscreen.ts',
+    sandbox: './src/sandbox/sandbox.ts',
   },
   module: {
     rules: [
@@ -31,7 +33,8 @@ module.exports = {
     new CopyPlugin({
       patterns: [
         { from: 'public', to: '.' },
-        { from: 'src/content/styles.css', to: '.' }
+        { from: 'src/content/styles.css', to: '.' },
+        { from: 'src/offscreen/offscreen.html', to: '.' }
       ],
     }),
   ],

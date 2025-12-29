@@ -6,7 +6,8 @@ export interface AudioChunk {
     sentences: Sentence[];
     startWordIndex: number;
     endWordIndex: number;
-    audioUrl?: string; // Blob URL
+    audioUrl?: string; // Blob URL (Legacy/System)
+    audioId?: string;  // ElevenLabs Audio ID (Offscreen)
     alignment?: any;   // ElevenLabs alignment
     status: 'pending' | 'loading' | 'ready' | 'error';
     error?: string;

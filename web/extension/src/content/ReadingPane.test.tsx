@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
 import ReadingPane from './ReadingPane';
@@ -10,7 +11,8 @@ jest.useFakeTimers();
 jest.mock('./audio/AudioRecorder', () => {
   return {
     AudioRecorder: jest.fn().mockImplementation(() => ({
-      start: jest.fn().mockResolvedValue({}),
+      prepare: jest.fn().mockResolvedValue({}),
+      startRecording: jest.fn(),
       stop: jest.fn().mockResolvedValue(new Blob(['audio data'], { type: 'audio/webm' })),
       isRecording: jest.fn().mockReturnValue(false)
     }))
@@ -46,19 +48,22 @@ const mockSpeak = jest.fn();
 const mockCancel = jest.fn();
 const mockResume = jest.fn();
 const mockPause = jest.fn();
-const mockGetVoices = jest.fn().mockReturnValue([{ name: 'Google US English', lang: 'en-US' }]);
+const mockGetVoices = jest.fn().mockReturnValue([{ name: 'Google US English', lang: 'en-US', voiceURI: 'google-us-english' }]);
+
+const mockSpeechSynthesis = {
+  speak: mockSpeak,
+  cancel: mockCancel,
+  resume: mockResume,
+  pause: mockPause,
+  getVoices: mockGetVoices,
+  paused: false,
+  speaking: false,
+  pending: false,
+  onvoiceschanged: null
+};
 
 Object.defineProperty(window, 'speechSynthesis', {
-  value: {
-    speak: mockSpeak,
-    cancel: mockCancel,
-    resume: mockResume,
-    pause: mockPause,
-    getVoices: mockGetVoices,
-    paused: false,
-    speaking: false,
-    pending: false
-  },
+  value: mockSpeechSynthesis,
   writable: true,
 });
 
@@ -95,6 +100,9 @@ describe('ReadingPane', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateObjectURL.mockReturnValue('blob:mock-url');
+    // Reset state
+    mockSpeechSynthesis.speaking = false;
+    mockSpeechSynthesis.paused = false;
   });
 
   it('renders text from alignment map', () => {
@@ -174,6 +182,9 @@ describe('ReadingPane', () => {
       jest.advanceTimersByTime(100);
     });
 
+    // Simulate speaking state
+    mockSpeechSynthesis.speaking = true;
+
     const pauseButton = screen.getByTitle('Pause');
 
     // Pause
@@ -181,6 +192,12 @@ describe('ReadingPane', () => {
       pauseButton.click();
     });
     expect(mockPause).toHaveBeenCalled();
+
+    // Resume (test assumes button switches or just verify calls)
+    // paused state in mock:
+    mockSpeechSynthesis.paused = true;
+
+    // UI should show Resume button if logic depends on isPaused state, which it does.
     expect(screen.getByTitle('Resume')).toBeInTheDocument();
     expect(screen.queryByTitle('Pause')).not.toBeInTheDocument();
 

@@ -17,15 +17,20 @@ export class AudioRecorder {
     }
   }
 
-  async start(): Promise<MediaStream | null> {
+  async prepare(): Promise<MediaStream | null> {
     if (!this.stream) {
       const permitted = await this.requestPermission();
       if (!permitted) {
         throw new Error('Microphone permission denied');
       }
     }
+    return this.stream;
+  }
 
-    if (!this.stream) return null;
+  startRecording(): void {
+    if (!this.stream) {
+      throw new Error('Stream not initialized. Call prepare() first.');
+    }
 
     this.mediaRecorder = new MediaRecorder(this.stream);
     this.audioChunks = [];
@@ -35,7 +40,6 @@ export class AudioRecorder {
     };
 
     this.mediaRecorder.start();
-    return this.stream;
   }
 
   stop(): Promise<Blob> {

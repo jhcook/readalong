@@ -7,7 +7,7 @@ describe('AudioRecorder', () => {
 
   beforeEach(() => {
     recorder = new AudioRecorder();
-    
+
     mockStream = {
       getTracks: jest.fn().mockReturnValue([{ stop: jest.fn() }])
     };
@@ -35,23 +35,26 @@ describe('AudioRecorder', () => {
   });
 
   it('requests permission and starts recording', async () => {
-    await recorder.start();
-    
+    await recorder.prepare();
+
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
+
+    recorder.startRecording();
     expect((global as any).MediaRecorder).toHaveBeenCalledWith(mockStream);
     expect(mockMediaRecorder.start).toHaveBeenCalled();
   });
 
   it('stops recording and returns blob', async () => {
-    await recorder.start();
-    
+    await recorder.prepare();
+    recorder.startRecording();
+
     const stopPromise = recorder.stop();
-    
+
     // Simulate MediaRecorder behavior
     if (mockMediaRecorder.onstop) {
       mockMediaRecorder.onstop();
     }
-    
+
     const blob = await stopPromise;
     expect(blob).toBeInstanceOf(Blob);
     expect(mockMediaRecorder.stop).toHaveBeenCalled();
@@ -60,9 +63,10 @@ describe('AudioRecorder', () => {
 
   it('checks recording state', async () => {
     expect(recorder.isRecording()).toBe(false);
-    
+
     mockMediaRecorder.state = 'recording';
-    await recorder.start();
+    await recorder.prepare();
+    recorder.startRecording();
     expect(recorder.isRecording()).toBe(true);
   });
 });

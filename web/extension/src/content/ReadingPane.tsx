@@ -25,6 +25,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [theme, setTheme] = useState<'professional' | 'playful' | 'academic' | 'building-blocks' | 'minimal'>('professional');
   const [settingsLoaded, setSettingsLoaded] = useState<boolean>(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
@@ -76,7 +77,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     if (currentWordIndex >= 0 && containerRef.current) {
       const activeEl = containerRef.current.querySelector('.readalong-word.active') as HTMLElement;
-      if (activeEl) {
+      if (activeEl && !isMinimized) {
         const containerRect = containerRef.current.getBoundingClientRect();
         const activeRect = activeEl.getBoundingClientRect();
 
@@ -472,6 +473,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const toggleSettings = () => setIsSettingsOpen(!isSettingsOpen);
   const toggleHighContrast = () => setIsHighContrast(!isHighContrast);
   const toggleDyslexiaFont = () => setIsDyslexiaFont(!isDyslexiaFont);
+  const toggleMinimize = () => setIsMinimized(!isMinimized);
 
   if (!settingsLoaded) {
     return null; // Or a loading spinner
@@ -494,15 +496,16 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     (activeSystemVoice.localService === false || activeSystemVoice.name.includes('Google'));
 
   return (
-    <div className={`readalong-overlay theme-${theme} ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''}`}>
-      <div className="readalong-container">
-        <div className="readalong-header">
+    <div className={`readalong-overlay theme-${theme} ${isHighContrast ? 'high-contrast' : ''} ${isDyslexiaFont ? 'dyslexia-font' : ''} ${isMinimized ? 'minimized' : ''}`}>
+      <div className={`readalong-container ${isMinimized ? 'minimized' : ''}`}>
+        <div className={`readalong-header ${isMinimized ? 'minimized' : ''}`}>
           <h2>
-            ReadAlong
-            {!isOnline && <span style={{ fontSize: '0.6em', marginLeft: '10px', background: '#666', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>OFFLINE</span>}
+            {!isMinimized && 'ReadAlong'}
+            {isMinimized && '🎧'}
+            {!isOnline && !isMinimized && <span style={{ fontSize: '0.6em', marginLeft: '10px', background: '#666', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>OFFLINE</span>}
           </h2>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', position: 'relative' }}>
-            {allWords.length > 0 && !isPlaying && !isLoadingAudio && (
+            {!isMinimized && allWords.length > 0 && !isPlaying && !isLoadingAudio && (
               <button
                 className="readalong-control-btn"
                 onClick={() => handleReadAloud(0)}
@@ -516,22 +519,26 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
               <span style={{ fontSize: '0.8em', color: '#666' }}>Loading Audio...</span>
             )}
 
-            {isPlaying && (
+            {(isPlaying || isMinimized) && (
               <>
-                <button
-                  className="readalong-control-btn"
-                  onClick={() => navigateSentence('back')}
-                  title="Back One Sentence"
-                >
-                  ⏮
-                </button>
-                <button
-                  className="readalong-control-btn"
-                  onClick={() => navigateSentence('forward')}
-                  title="Forward One Sentence"
-                >
-                  ⏭
-                </button>
+                {!isMinimized && (
+                  <>
+                    <button
+                      className="readalong-control-btn"
+                      onClick={() => navigateSentence('back')}
+                      title="Back One Sentence"
+                    >
+                      ⏮
+                    </button>
+                    <button
+                      className="readalong-control-btn"
+                      onClick={() => navigateSentence('forward')}
+                      title="Forward One Sentence"
+                    >
+                      ⏭
+                    </button>
+                  </>
+                )}
                 {!isPaused ? (
                   <button className="readalong-control-btn" onClick={handlePause} title="Pause">
                     Pause
@@ -547,16 +554,18 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
               </>
             )}
 
-            {voiceSource === 'record' && (
+            {voiceSource === 'record' && !isMinimized && (
               <button onClick={toggleRecording} className={`readalong-control-btn ${isRecording ? 'recording' : ''}`}>
                 {isRecording ? 'Stop' : 'Record'}
               </button>
             )}
 
             {/* Settings Toggle */}
-            <button onClick={toggleSettings} className="readalong-control-btn" title="Settings">
-              ⚙️
-            </button>
+            {!isMinimized && (
+              <button onClick={toggleSettings} className="readalong-control-btn" title="Settings">
+                ⚙️
+              </button>
+            )}
 
             {/* Settings Menu Dropdown */}
             {isSettingsOpen && (
@@ -730,42 +739,47 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
               </div>
             )}
 
+            <button onClick={toggleMinimize} className="readalong-control-btn" title={isMinimized ? "Expand" : "Minimize"}>
+              {isMinimized ? '↗️' : '_'}
+            </button>
             <button onClick={onClose} className="readalong-close-btn">&times;</button>
           </div>
         </div>
-        <div className="readalong-content" ref={containerRef}>
-          {alignmentMap ? (
-            alignmentMap.sentences.map((sentence, sIdx) => (
-              <p key={sIdx}>
-                {sentence.words.map((word, wIdx) => {
-                  const isCurrentWord = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
-                  let isActive = isCurrentWord;
+        {!isMinimized && (
+          <div className="readalong-content" ref={containerRef}>
+            {alignmentMap ? (
+              alignmentMap.sentences.map((sentence, sIdx) => (
+                <p key={sIdx}>
+                  {sentence.words.map((word, wIdx) => {
+                    const isCurrentWord = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
+                    let isActive = isCurrentWord;
 
-                  // Fallback: If using a "dumb" voice (no word boundaries), highlight the whole sentence
-                  // if the current word pointer is anywhere in this sentence.
-                  if (isSentenceHighlightMode && currentWordIndex >= 0) {
-                    const currentGlobalWord = allWords[currentWordIndex];
-                    // Check if the word currently being spoken is part of this sentence
-                    if (sentence.words.includes(currentGlobalWord)) {
-                      isActive = true;
+                    // Fallback: If using a "dumb" voice (no word boundaries), highlight the whole sentence
+                    // if the current word pointer is anywhere in this sentence.
+                    if (isSentenceHighlightMode && currentWordIndex >= 0) {
+                      const currentGlobalWord = allWords[currentWordIndex];
+                      // Check if the word currently being spoken is part of this sentence
+                      if (sentence.words.includes(currentGlobalWord)) {
+                        isActive = true;
+                      }
                     }
-                  }
 
-                  return (
-                    <span
-                      key={wIdx}
-                      className={`readalong-word ${isActive ? 'active' : ''}`}
-                    >
-                      {word.text}{' '}
-                    </span>
-                  );
-                })}
-              </p>
-            ))
-          ) : (
-            <div dangerouslySetInnerHTML={{ __html: text || '' }} />
-          )}
-        </div>
+                    return (
+                      <span
+                        key={wIdx}
+                        className={`readalong-word ${isActive ? 'active' : ''}`}
+                      >
+                        {word.text}{' '}
+                      </span>
+                    );
+                  })}
+                </p>
+              ))
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: text || '' }} />
+            )}
+          </div>
+        )}
       </div>
     </div >
   );

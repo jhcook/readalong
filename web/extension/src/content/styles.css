@@ -224,3 +224,40 @@
     opacity: 1;
   }
 }
+
+/* Minimized State */
+.readalong-overlay.minimized {
+  width: auto;
+  height: auto;
+  top: 20px;
+  right: 20px;
+  left: auto;
+  bottom: auto;
+  background: transparent;
+  pointer-events: none;
+  /* Let clicks pass through outside the widget */
+}
+
+.readalong-container.minimized {
+  width: auto;
+  height: auto;
+  max-width: 300px;
+  padding: 0;
+  pointer-events: auto;
+  /* Re-enable pointer events for the widget itself */
+  border-radius: 50px;
+  /* Bubble shape */
+  background: var(--bg-color);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.readalong-header.minimized {
+  padding: 10px 15px;
+  justify-content: center;
+  border-bottom: none;
+}
+
+.readalong-header.minimized h2 {
+  font-size: 1.5rem;
+  margin-right: 10px;
+}

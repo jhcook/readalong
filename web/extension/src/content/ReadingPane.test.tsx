@@ -643,4 +643,29 @@ describe('ReadingPane', () => {
     expect(helloWord).toHaveClass('active');
     expect(worldWord).toHaveClass('active');
   });
+
+  it('minimizes and expands the UI', () => {
+    render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+    // Initially not minimized
+    expect(screen.getByText('ReadAlong')).toBeInTheDocument();
+    const minimizeButton = screen.getByTitle('Minimize');
+    expect(minimizeButton).toBeInTheDocument();
+
+    // Minimise
+    fireEvent.click(minimizeButton);
+
+    // Verify minimized state
+    expect(screen.queryByText('ReadAlong')).not.toBeInTheDocument();
+    expect(screen.getByText('🎧')).toBeInTheDocument(); // Header changes
+    expect(screen.queryByTitle('Settings')).not.toBeInTheDocument(); // Settings hidden
+
+    // Expand
+    const expandButton = screen.getByTitle('Expand');
+    fireEvent.click(expandButton);
+
+    // Verify expanded state
+    expect(screen.getByText('ReadAlong')).toBeInTheDocument();
+    expect(screen.queryByText('🎧')).not.toBeInTheDocument();
+  });
 });

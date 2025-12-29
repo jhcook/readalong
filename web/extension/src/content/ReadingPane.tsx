@@ -123,12 +123,18 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   // Check voices
   useEffect(() => {
     let mounted = true;
+
     const updateVoices = () => {
       if (!mounted) return;
       const availableVoices = window.speechSynthesis.getVoices();
-      if (availableVoices.length > 0) {
-        setVoices(availableVoices);
-      }
+
+      setVoices(prev => {
+        // Simple optimization: verify if voices actually changed
+        if (prev.length !== availableVoices.length) return availableVoices;
+        const allMatch = prev.every((v, i) => v.voiceURI === availableVoices[i].voiceURI);
+        if (allMatch) return prev;
+        return availableVoices;
+      });
     };
 
     updateVoices();
@@ -136,11 +142,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
     // Polling fallback to ensure voices load in Chrome/Safari if event is missed
     const intervalId = setInterval(() => {
-      const v = window.speechSynthesis.getVoices();
-      if (v.length > 0) {
-        setVoices(v);
-        // Don't clear interval, voice list might update (e.g. remote voices loading)
-      }
+      updateVoices();
     }, 1000);
 
     return () => {
@@ -149,6 +151,11 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       clearInterval(intervalId);
     };
   }, []);
+
+  const handleRefreshVoices = () => {
+    const availableVoices = window.speechSynthesis.getVoices();
+    setVoices(availableVoices);
+  };
 
   // Fetch ElevenLabs voices
   useEffect(() => {
@@ -592,7 +599,17 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
                 {voiceSource === 'system' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label htmlFor="system-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>System Voice</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label htmlFor="system-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>System Voice</label>
+                      <button
+                        onClick={handleRefreshVoices}
+                        className="readalong-control-btn"
+                        style={{ fontSize: '10px', padding: '2px 5px', height: 'auto' }}
+                        title="Refresh System Voices"
+                      >
+                        ↻
+                      </button>
+                    </div>
                     <select
                       id="system-voice-select"
                       value={systemVoiceURI}

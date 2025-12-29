@@ -45,7 +45,7 @@ const mockSpeak = jest.fn();
 const mockCancel = jest.fn();
 const mockResume = jest.fn();
 const mockPause = jest.fn();
-const mockGetVoices = jest.fn().mockReturnValue([{ name: 'Google US English', lang: 'en-US', voiceURI: 'google-us' }]);
+const mockGetVoices = jest.fn().mockReturnValue([{ name: 'System Voice', lang: 'en-US', voiceURI: 'system-us' }]);
 
 Object.defineProperty(window, 'speechSynthesis', {
     value: {
@@ -182,6 +182,9 @@ describe('ReadingPane Synchronization', () => {
         };
         (global as any).chrome = mockChrome;
         (window as any).chrome = mockChrome;
+
+        // Mock scrollIntoView
+        HTMLElement.prototype.scrollIntoView = jest.fn();
     });
 
     it('Syncs TTS highlighting using onboundary events', async () => {

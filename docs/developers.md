@@ -20,6 +20,12 @@
     ```
     This creates a `dist` folder in `web/extension/`.
 
+4.  **Package for Release:**
+    ```bash
+    npm run package
+    ```
+    This creates a `release` folder in `web/extension/` containing zip files for Chrome, Firefox, and Safari.
+
 ## 2. Loading into Chrome/Edge
 
 1.  Open Chrome/Edge and navigate to `chrome://extensions`.

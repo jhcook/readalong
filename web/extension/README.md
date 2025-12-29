@@ -31,11 +31,15 @@ To build the extension for production (minified):
 npm run build
 ```
 
-To watch for changes and rebuild automatically during development:
+### Package
+
+To build and package the extension for all browsers (Chrome, Firefox, Safari) into zip files:
 
 ```bash
-npm run watch
+npm run package
 ```
+
+The generated zip files will be located in the `release/` directory.
 
 ### Loading into Chrome
 

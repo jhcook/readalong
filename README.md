@@ -1,8 +1,8 @@
-# 📖 ReadAlong+: Parent‑Voice Guided Reading System
+# ReadAlong+: Parent‑Voice Guided Reading System
 A cross‑platform, privacy‑first read‑along experience for children
 Supports Chrome, Firefox, Edge, Safari, iOS, Android
 
-🌟 Overview
+## Overview
 ReadAlong+ is a hybrid, cross‑platform reading companion that allows children to follow along with stories using parent or cloned voices.
 
 > [!NOTE]
@@ -28,29 +28,29 @@ Web via a responsive reading interface
 
 The architecture prioritizes privacy, offline capability, and high‑quality narration, blending local processing with cloud‑based voice synthesis.
 
-🚀 Key Features
-🔊 Parent Voice Integration
+# Key Features
+## Parent Voice Integration
 Local speech‑to‑text using Whisper.cpp  or Vosk
 
 Forced alignment to match spoken words with text
 
 No raw audio leaves the device
 
-🗣️ Cloned Voice Narration (Optional)
+## Cloned Voice Narration (Optional)
 ElevenLabs API integration
 
 Streaming or pre‑generated TTS
 
 Multiple voice profiles (parent, narrator, characters)
 
-✨ Read‑Along Highlighting
+## Read‑Along Highlighting
 Word‑level or sentence‑level highlighting
 
 Smooth animations
 
 Accessibility‑friendly color schemes
 
-🎛️ Child Controls
+## Child Controls
 Play / Pause
 
 Back one sentence
@@ -61,22 +61,22 @@ Repeat
 
 Adjustable reading speed
 
-📦 Cross‑Platform Support
+## Cross‑Platform Support
 Chrome, Firefox, Edge, Safari (desktop)
 
 iOS & Android (native app)
 
 Web app fallback
 
-🔐 Privacy & Safety
+## Privacy & Safety
 Local‑only voice capture
 
 COPPA‑aligned child mode
 
 Secure storage for alignments and audio
 
-🏗️ Architecture
-Code
+## Architecture
+```bash
  ┌──────────────────────────────────────────────────────────────┐
  │                          Front-End UI                        │
  │  (Browser Extension / Mobile App / Web App)                  │
@@ -84,34 +84,36 @@ Code
                  │
                  ▼
  ┌──────────────────────────────────────────────────────────────┐
- │                 Text Rendering & Highlight Engine             │
+ │                 Text Rendering & Highlight Engine            │
  │  (DOM injection or native renderer)                          │
  └──────────────────────────────────────────────────────────────┘
                  │
                  ▼
  ┌──────────────────────────────────────────────────────────────┐
- │                 Local Processing Layer                        │
- │  - Whisper.cpp / Vosk STT                                     │
- │  - Forced alignment (Gentle/Aeneas/Whisper timestamps)        │
- │  - Offline mode                                               │
+ │                 Local Processing Layer                       │
+ │  - Whisper.cpp / Vosk STT                                    │
+ │  - Forced alignment (Gentle/Aeneas/Whisper timestamps)       │
+ │  - Offline mode                                              │
  └──────────────────────────────────────────────────────────────┘
                  │
                  ▼
  ┌──────────────────────────────────────────────────────────────┐
- │                 Cloud Integration Layer                       │
- │  - ElevenLabs TTS API                                         │
- │  - Optional cloud STT fallback                                │
+ │                 Cloud Integration Layer                      │
+ │  - ElevenLabs TTS API                                        │
+ │  - Optional cloud STT fallback                               │
  └──────────────────────────────────────────────────────────────┘
                  │
                  ▼
  ┌──────────────────────────────────────────────────────────────┐
- │                 Data & Storage Layer                          │
- │  - IndexedDB (browser)                                        │
- │  - Secure storage (mobile)                                    │
- │  - Optional cloud sync                                        │
+ │                 Data & Storage Layer                         │
+ │  - IndexedDB (browser)                                       │
+ │  - Secure storage (mobile)                                   │
+ │  - Optional cloud sync                                       │
  └──────────────────────────────────────────────────────────────┘
-📚 Project Structure (Proposed)
-Code
+```
+
+## Project Structure (Proposed)
+```bash
 readalong-plus/
 │
 ├── extensions/
@@ -141,7 +143,9 @@ readalong-plus/
     ├── architecture/
     ├── user-stories/
     └── roadmap/
-🧩 Epics & Deliverables
+```
+
+## Epics & Deliverables
 This project is organized into 10 major epics:
 
 Core Text Rendering & Highlighting
@@ -166,7 +170,7 @@ UX, Accessibility, Onboarding
 
 Each epic includes fully formed user stories with acceptance criteria (see /docs/user-stories).
 
-🛠️ Technology Stack
+## Technology Stack
 Frontend
 TypeScript
 
@@ -193,7 +197,7 @@ IndexedDB
 
 Secure mobile storage (Keychain/Keystore)
 
-🔒 Privacy Principles
+## Privacy Principles
 Parent voice recordings never leave the device
 
 No third‑party analytics in child mode
@@ -202,7 +206,7 @@ All cloud calls are opt‑in
 
 COPPA‑aligned design
 
-🧪 Testing Strategy
+## Testing Strategy
 Unit tests for tokenization, alignment, highlighting
 
 Integration tests for STT + alignment
@@ -213,7 +217,7 @@ Mobile UI tests (Detox / Flutter Driver)
 
 Accessibility audits (WCAG 2.2)
 
-🗺️ Roadmap (High‑Level)
+## Roadmap (High‑Level)
 Phase 1 — Foundations
 Text rendering, highlighting, local STT, basic alignment
 
@@ -229,7 +233,7 @@ iOS + Android with native Whisper modules
 Phase 5 — Privacy & UX Hardening
 Child mode, accessibility, performance
 
-🤝 Contributing
+## Contributing
 Contributions are welcome. Please see:
 
 /docs/architecture/
@@ -246,5 +250,5 @@ Tests pass
 
 Documentation is updated
 
-📄 License
+## License
 To be determined (MIT, Apache 2.0, or proprietary).

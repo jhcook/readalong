@@ -35,3 +35,16 @@ ReadAlong is currently available for manual installation. Please follow the inst
 5.  Open Safari and go to **Safari** > **Settings** > **Extensions**.
 6.  (Note: Safari typically requires extensions to be packaged as Apps. For development testing, you may need to use Xcode to build the extension container).
     *   *Alternative*: If you are a developer, you can convert the web extension using `xcrun safari-web-extension-converter path/to/extracted/folder` and run it via Xcode.
+
+## Official Channels (Coming Soon)
+
+We are working on making ReadAlong available on official browser stores.
+
+- [**Chrome Web Store**](#)
+- [**Firefox Add-ons**](#)
+- [**Microsoft Edge Add-ons**](#)
+
+---
+
+> [!TIP]
+> For maintainers looking to publish updates, please refer to the [Distribution Guide](docs/distribution.md).

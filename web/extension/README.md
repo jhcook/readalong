@@ -41,6 +41,10 @@ npm run package
 
 The generated zip files will be located in the `release/` directory.
 
+### Distribution
+
+For detailed instructions on publishing to official browser stores (Chrome, Firefox, Edge, Safari), see the [Distribution Guide](../../docs/distribution.md).
+
 ### Loading into Chrome
 
 1.  Open Chrome and navigate to `chrome://extensions`.

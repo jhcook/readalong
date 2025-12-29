@@ -190,6 +190,39 @@ describe('ReadingPane Settings & Fallback', () => {
         expect((window.speechSynthesis.speak as jest.Mock)).not.toHaveBeenCalled();
     });
 
+    it('does NOT fallback to System TTS if Google Voices configured but missing keys', async () => {
+        // Mock settings loading with Google selected but NO key
+        mockGet.mockImplementation((keys, callback) => {
+            callback({
+                voiceSource: 'google',
+                googleApiKey: '', // Missing
+                selectedGoogleVoiceName: 'en-US-Neural2-A'
+            });
+        });
+
+        // Mock alert
+        jest.spyOn(window, 'alert').mockImplementation(() => { });
+
+        render(<ReadingPane alignmentMap={mockAlignmentMap} onClose={jest.fn()} />);
+
+        // Wait for settings load
+        await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+        // Click Read Aloud
+        const ttsButton = screen.getByTitle('Read Aloud');
+        expect(ttsButton).toBeInTheDocument();
+
+        act(() => {
+            ttsButton.click();
+        });
+
+        // Should Trigger Alert
+        expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Please configure Google Cloud API Key'));
+
+        // Should NOT trigger System TTS (speak)
+        expect((window.speechSynthesis.speak as jest.Mock)).not.toHaveBeenCalled();
+    });
+
     it('STOPS playback if voice settings change while playing', async () => {
         // Mock initial settings
         mockGet.mockImplementation((keys, callback) => {

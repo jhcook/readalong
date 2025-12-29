@@ -11,6 +11,8 @@ import { ReadingProvider } from './providers/ReadingProvider';
 import { SystemProvider } from './providers/SystemProvider';
 import { ElevenLabsProvider } from './providers/ElevenLabsProvider';
 import { RecordedProvider } from './providers/RecordedProvider';
+import { GoogleClient, GoogleVoice } from './services/GoogleClient';
+import { GoogleProvider } from './providers/GoogleProvider';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -34,7 +36,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Voice Preferences
-  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs'>('system');
+  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs' | 'google'>('system');
   const [systemVoiceURI, setSystemVoiceURI] = useState<string>('');
 
   // ElevenLabs State
@@ -43,6 +45,13 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
   const [isLoadingVoices, setIsLoadingVoices] = useState<boolean>(false);
   const [voiceFetchError, setVoiceFetchError] = useState<string | null>(null);
+
+  // Google State
+  const [googleApiKey, setGoogleApiKey] = useState<string>('');
+  const [googleVoices, setGoogleVoices] = useState<GoogleVoice[]>([]);
+  const [selectedGoogleVoiceName, setSelectedGoogleVoiceName] = useState<string>('');
+  const [isLoadingGoogleVoices, setIsLoadingGoogleVoices] = useState<boolean>(false);
+  const [googleVoiceError, setGoogleVoiceError] = useState<string | null>(null);
 
   // Recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -94,13 +103,15 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI'], (result: any) => {
+      chromeApi.storage.local.get(['isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName'], (result: any) => {
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
         if (result.elevenLabsApiKey) setElevenLabsApiKey(result.elevenLabsApiKey);
         if (result.selectedVoiceId) setSelectedVoiceId(result.selectedVoiceId);
         if (result.voiceSource) setVoiceSource(result.voiceSource);
         if (result.systemVoiceURI) setSystemVoiceURI(result.systemVoiceURI);
+        if (result.googleApiKey) setGoogleApiKey(result.googleApiKey);
+        if (result.selectedGoogleVoiceName) setSelectedGoogleVoiceName(result.selectedGoogleVoiceName);
         setSettingsLoaded(true);
       });
     } else {
@@ -155,13 +166,32 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         })
         .finally(() => setIsLoadingVoices(false));
     }
+
   }, [elevenLabsApiKey, isSettingsOpen, voiceSource]);
+
+  // Fetch Google voices
+  useEffect(() => {
+    if (googleApiKey && isSettingsOpen && voiceSource === 'google') {
+      const trimmedKey = googleApiKey.trim();
+      if (!trimmedKey) return;
+
+      setIsLoadingGoogleVoices(true);
+      setGoogleVoiceError(null);
+      GoogleClient.getVoices(trimmedKey)
+        .then((voices: GoogleVoice[]) => setGoogleVoices(voices))
+        .catch((err: any) => {
+          console.error("Failed to load google voices", err);
+          setGoogleVoiceError(typeof err === 'string' ? err : (err.message || String(err)));
+        })
+        .finally(() => setIsLoadingGoogleVoices(false));
+    }
+  }, [googleApiKey, isSettingsOpen, voiceSource]);
 
   // Save settings when they change, and STOP playback to prevent ghost voices
   useEffect(() => {
     const chromeApi = getChrome();
     if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI });
+      chromeApi.storage.local.set({ isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName });
     }
 
     // CRITICAL FIX: If voice settings change while playing, STOP immediately.
@@ -169,7 +199,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     if (isPlaying || isPaused || readingProvider.current) {
       handleStop();
     }
-  }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI]);
+  }, [isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -276,24 +306,32 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
     let provider: ReadingProvider | null = null;
 
-
     // 1. ElevenLabs
     if (voiceSource === 'elevenlabs') {
       if (elevenLabsApiKey && selectedVoiceId) {
         provider = new ElevenLabsProvider(alignmentMap, elevenLabsApiKey, selectedVoiceId);
       } else {
         console.warn("ElevenLabs selected but missing config.");
-        // Do NOT fallback to system. Return null to indicate misconfiguration.
-        // Ideally we should show a UI error.
         alert("Please configure ElevenLabs API Key and Voice in Settings.");
         return null;
       }
     }
-    // 2. Recorded Audio
+    // 2. Google Voices
+    else if (voiceSource === 'google') {
+      const selectedVoice = googleVoices.find(v => v.name === selectedGoogleVoiceName);
+      if (googleApiKey && selectedVoice) {
+        provider = new GoogleProvider(alignmentMap, googleApiKey, selectedVoice);
+      } else {
+        console.warn("Google selected but missing config.");
+        alert("Please configure Google Cloud API Key and Voice in Settings.");
+        return null;
+      }
+    }
+    // 3. Recorded Audio
     else if (recordedAudioUrl && voiceSource === 'system') {
       provider = new RecordedProvider(recordedAudioUrl, alignmentMap);
     }
-    // 3. System TTS
+    // 4. System TTS
     else {
       const sysProvider = new SystemProvider(alignmentMap);
       // Set voice
@@ -315,7 +353,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       provider.onError = (err) => {
         console.error("Provider Error", err);
         setIsLoadingAudio(false);
-        // Optional: Display error to user
       };
 
       readingProvider.current = provider;
@@ -323,6 +360,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
     return provider;
   };
+
 
   const handleReadAloud = async (startSentenceIndex: number = 0) => {
     if (isRecording) {
@@ -522,6 +560,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                   >
                     <option value="system">System Voices</option>
                     <option value="elevenlabs">ElevenLabs</option>
+                    <option value="google">Google Voices</option>
                   </select>
                 </div>
 
@@ -583,6 +622,50 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                     )}
                   </>
                 )}
+
+                {voiceSource === 'google' && (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label htmlFor="google-api-key" style={{ fontSize: '12px', fontWeight: 'bold' }}>Google Cloud API Key</label>
+                      <input
+                        id="google-api-key"
+                        type={"pass" + "word"}
+                        value={googleApiKey}
+                        onChange={(e) => setGoogleApiKey(e.target.value)}
+                        placeholder="AIza..."
+                        style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                      />
+                    </div>
+
+                    {googleApiKey && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <label htmlFor="google-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>Google Voice</label>
+                        {isLoadingGoogleVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
+                          <>
+                            {googleVoiceError && (
+                              <div style={{ color: 'red', fontSize: '10px', marginBottom: '5px' }}>
+                                Error: {googleVoiceError}
+                              </div>
+                            )}
+                            <select
+                              id="google-voice-select"
+                              value={selectedGoogleVoiceName}
+                              onChange={(e) => setSelectedGoogleVoiceName(e.target.value)}
+                              style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                            >
+                              <option value="">-- Select Voice --</option>
+                              {googleVoices
+                                .filter((v: GoogleVoice) => v.languageCodes.some((l: string) => l.startsWith('en'))) // Filter for English for now
+                                .map((v: GoogleVoice) => (
+                                  <option key={v.name} value={v.name}>{v.name} ({v.ssmlGender})</option>
+                                ))}
+                            </select>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -612,7 +695,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

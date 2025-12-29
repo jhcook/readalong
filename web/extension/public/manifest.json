@@ -22,6 +22,7 @@
   },
   "host_permissions": [
     "https://api.elevenlabs.io/*",
+    "https://texttospeech.googleapis.com/*",
     "https://ccoreilly.github.io/*"
   ],
   "content_scripts": [

@@ -16,6 +16,10 @@ let shadowRoot: ShadowRoot | null = null;
 function mountReadingPane(text: string, alignmentMap?: AlignmentMap) {
   if (rootElement) return;
 
+  // Cleanup any existing root from orphaned scripts
+  const existingRoot = document.getElementById('readalong-root');
+  if (existingRoot) existingRoot.remove();
+
   rootElement = document.createElement('div');
   rootElement.id = 'readalong-root';
   // Use documentElement to avoid conflicts with body observers (e.g. Popup Maker)

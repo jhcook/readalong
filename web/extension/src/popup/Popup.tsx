@@ -1,11 +1,23 @@
 import React from 'react';
 
 const Popup = () => {
-  const handleLoadText = async () => {
+  const sendMessage = async (message: { type: string }) => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab?.id) {
-        await chrome.tabs.sendMessage(tab.id, { type: 'LOAD_TEXT' });
+        try {
+          await chrome.tabs.sendMessage(tab.id, message);
+        } catch (initialError) {
+          console.log('Content script not ready, injecting...', initialError);
+          // If first attempt fails, try injecting the content script
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+
+          // Retry sending the message
+          await chrome.tabs.sendMessage(tab.id, message);
+        }
         window.close(); // Close popup after action
       }
     } catch (error) {
@@ -14,20 +26,9 @@ const Popup = () => {
     }
   };
 
+  const handleLoadText = () => sendMessage({ type: 'LOAD_TEXT' });
 
-
-  const handleSelectContent = async () => {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id) {
-        await chrome.tabs.sendMessage(tab.id, { type: 'ENTER_SELECTION_MODE' });
-        window.close();
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      alert('Error: Could not communicate with the page. Try refreshing the page.');
-    }
-  };
+  const handleSelectContent = () => sendMessage({ type: 'ENTER_SELECTION_MODE' });
 
   return (
     <div>

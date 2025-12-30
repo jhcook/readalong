@@ -49,12 +49,19 @@ export function tokenizeText(text: string): AlignmentMap {
     for (const wordSegment of wordSegments) {
       if (wordSegment.isWordLike) {
         if (bufferHasWord) {
-          // We already have a word in the buffer (and possibly trailing punct), flush it
-          words.push({
-            text: currentBuffer,
-            index: wordIndex++
-          });
-          currentBuffer = wordSegment.segment;
+          // Check for hyphenated word case (e.g. sub-agents)
+          // If buffer ends in a hyphen (and not space), merge instead of flush
+          if (currentBuffer.endsWith('-') && !/\s$/.test(currentBuffer)) {
+             currentBuffer += wordSegment.segment;
+             // Still has word, continue
+          } else {
+             // Standard flush
+             words.push({
+               text: currentBuffer,
+               index: wordIndex++
+             });
+             currentBuffer = wordSegment.segment;
+          }
         } else {
           // Buffer was empty or had leading punct, just append
           currentBuffer += wordSegment.segment;
@@ -62,7 +69,22 @@ export function tokenizeText(text: string): AlignmentMap {
         }
       } else {
         // Punctuation or whitespace
-        currentBuffer += wordSegment.segment;
+        // Check if we should flush BEFORE adding this punctuation
+        // e.g. "of " + "“" -> Flush "of " first.
+        if (bufferHasWord && /\s$/.test(currentBuffer)) {
+             // Buffer has a word and ends in space. This punctuation likely starts a NEW word sequence.
+             // OR it is a separate punctuation mark.
+             // Flush "Word "
+             words.push({
+               text: currentBuffer,
+               index: wordIndex++
+             });
+             currentBuffer = wordSegment.segment;
+             bufferHasWord = false; 
+        } else {
+             // Append (e.g. "word" + "," -> "word," or "sub" + "-" -> "sub-")
+             currentBuffer += wordSegment.segment;
+        }
       }
     }
 

@@ -1,5 +1,3 @@
-import { chrome } from 'jest-chrome';
-
 // Mock dependencies
 jest.mock('./AudioCache', () => ({
     AudioCache: jest.fn().mockImplementation(() => ({
@@ -38,9 +36,6 @@ if (!chrome.offscreen) {
         Reason: { AUDIO_PLAYBACK: 'AUDIO_PLAYBACK' }
     };
 }
-
-// Setup global chrome
-Object.assign(global, { chrome });
 
 // Mock crypto and TextEncoder for generateId
 if (!global.TextEncoder) {

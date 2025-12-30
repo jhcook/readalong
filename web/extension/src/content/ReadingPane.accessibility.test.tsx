@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-// import { chrome } from 'jest-chrome'; // We will use a manual mock to ensure full control
 import ReadingPane from './ReadingPane';
 
 // Manual mock for chrome to avoid jest-chrome issues with React state updates or timing

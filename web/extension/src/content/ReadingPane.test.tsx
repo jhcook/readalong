@@ -51,7 +51,7 @@ const mockSpeak = jest.fn();
 const mockCancel = jest.fn();
 const mockResume = jest.fn();
 const mockPause = jest.fn();
-const mockGetVoices = jest.fn().mockReturnValue([{ name: 'Google US English', lang: 'en-US', voiceURI: 'google-us-english' }]);
+const mockGetVoices = jest.fn().mockReturnValue([{ name: 'US English', lang: 'en-US', voiceURI: 'us-english', localService: true }]);
 
 const mockSpeechSynthesis = {
   speak: mockSpeak,

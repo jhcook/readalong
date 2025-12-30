@@ -1,10 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { chrome } from 'jest-chrome';
 import Popup from './Popup';
-
-// Ensure chrome is global for the component
-(global as any).chrome = chrome;
 
 // Mock window.close
 const originalClose = window.close;

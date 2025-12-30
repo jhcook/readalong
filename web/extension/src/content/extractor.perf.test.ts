@@ -22,7 +22,9 @@ describe('Extractor Performance/Robustness', () => {
             current.appendChild(next);
             current = next;
         }
-        current.textContent = 'Deep content';
+        const p = document.createElement('p');
+        p.textContent = 'Deep content that is long enough to be considered valid content by the heuristic. '.repeat(5);
+        current.appendChild(p);
 
         const start = performance.now();
         const content = extractMainContent(document);

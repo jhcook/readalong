@@ -77,6 +77,57 @@ export function extractContentFromNode(node: Node): string {
 }
 
 /**
+ * Calculates a content quality score for an element.
+ * Higher is better.
+ */
+function calculateScore(element: Element): number {
+  let score = 0;
+
+  // 1. Base Text Length Score (1 point per 100 chars)
+  const text = element.textContent || '';
+  if (text.length < 50) return 0; // Too short
+  score += text.length / 100;
+
+  // 2. Paragraph Density
+  const paragraphs = element.querySelectorAll('p');
+  let paragraphTextLength = 0;
+  paragraphs.forEach(p => {
+    const pText = p.textContent || '';
+    if (pText.length > 50) {
+      score += 5; // Bonus for substantial paragraphs
+      paragraphTextLength += pText.length;
+    }
+  });
+
+  // 3. Link Density Penalty
+  const links = element.querySelectorAll('a');
+  let linkTextLength = 0;
+  links.forEach(a => {
+    linkTextLength += (a.textContent || '').length;
+  });
+
+  const linkDensity = text.length > 0 ? linkTextLength / text.length : 1;
+  if (linkDensity > 0.5) {
+    score -= 50; // Heavy penalty for mostly links (navs, sidebars)
+  } else if (linkDensity > 0.2) {
+    score -= 10;
+  }
+
+  // 4. Header Bonus
+  const headers = element.querySelectorAll('h1, h2, h3');
+  score += headers.length * 3;
+
+  // 5. List Penalty (if lists dominate)
+  const listItems = element.querySelectorAll('li');
+  // If we have many list items but few paragraphs, it's likely a menu or listicle
+  if (listItems.length > 10 && paragraphs.length < 2) {
+      score -= 20;
+  }
+
+  return score;
+}
+
+/**
  * Extracts visible HTML from the document, attempting to identify the main content,
  * including content within open Shadow DOMs.
  */
@@ -90,7 +141,7 @@ export function extractMainContent(doc: Document): string {
   const topLevelCandidates = Array.from(doc.querySelectorAll(commonSelectors.join(', ')));
   
   let bestCandidate: Element | null = null;
-  let maxCandidateLength = 0;
+  let maxScore = 0;
 
   // Check top-level candidates
   for (const candidate of topLevelCandidates) {
@@ -98,17 +149,20 @@ export function extractMainContent(doc: Document): string {
     if ((candidate as HTMLElement).offsetParent === null) continue;
 
     const flattened = flattenNode(candidate);
-    if (flattened) {
-      const text = flattened.textContent || '';
-      if (text.length > maxCandidateLength) {
-        maxCandidateLength = text.length;
-        bestCandidate = flattened as Element;
+    if (flattened && flattened.nodeType === Node.ELEMENT_NODE) {
+      const el = flattened as Element;
+      const score = calculateScore(el);
+      
+      if (score > maxScore) {
+        maxScore = score;
+        bestCandidate = el;
       }
     }
   }
 
   // If we found a good candidate, return it
-  if (bestCandidate && maxCandidateLength > 500) {
+  // Threshold: e.g. 20 points (approx 2000 chars or 4 paragraphs)
+  if (bestCandidate && maxScore > 20) {
     return sanitizeContent(bestCandidate.innerHTML);
   }
 
@@ -128,14 +182,13 @@ export function extractMainContent(doc: Document): string {
   }
 
   let bestElement: HTMLElement | null = null;
-  let maxTextLength = 0;
+  maxScore = 0;
 
   for (const container of candidates) {
     const el = container as HTMLElement;
-    // .innerText might not work well on detached/cloned nodes in all envs, use textContent
-    const text = (el.textContent || '').trim();
-    if (text.length > maxTextLength) {
-      maxTextLength = text.length;
+    const score = calculateScore(el);
+    if (score > maxScore) {
+      maxScore = score;
       bestElement = el;
     }
   }

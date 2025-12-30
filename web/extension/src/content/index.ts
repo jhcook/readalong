@@ -89,9 +89,12 @@ function enableSelectionMode() {
     style.id = styleId;
     style.textContent = `
       .readalong-hover {
-        outline: 2px solid #2ea44f !important;
+        outline: 3px solid #2ea44f !important;
         cursor: pointer !important;
         background-color: rgba(46, 164, 79, 0.1) !important;
+        box-shadow: 0 0 10px rgba(46, 164, 79, 0.5) !important;
+        z-index: 2147483647 !important;
+        position: relative !important;
       }
     `;
     document.head.appendChild(style);

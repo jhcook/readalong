@@ -18,7 +18,9 @@ const ignoreSelectors = [
  * Recursively traverses and flattens the DOM, including Shadow Roots.
  * Returns a cloned element with Shadow DOM content expanded into children.
  */
-function flattenNode(node: Node): Node | null {
+function flattenNode(node: Node, depth: number = 0, maxDepth: number = 500): Node | null {
+  if (depth > maxDepth) return null;
+
   // 1. Text Nodes: Keep as is
   if (node.nodeType === Node.TEXT_NODE) {
     return node.cloneNode(true);
@@ -45,7 +47,7 @@ function flattenNode(node: Node): Node | null {
 
     // Recursively flatten children
     Array.from(sourceNodes).forEach(child => {
-      const flattenedChild = flattenNode(child);
+      const flattenedChild = flattenNode(child, depth + 1, maxDepth);
       if (flattenedChild) {
         clone.appendChild(flattenedChild);
       }
@@ -79,7 +81,38 @@ export function extractContentFromNode(node: Node): string {
  * including content within open Shadow DOMs.
  */
 export function extractMainContent(doc: Document): string {
-  // 4. Flatten the entire document body
+  // Optimization: Check for common top-level containers first to avoid flattening the entire body
+  const commonSelectors = [
+    'article', 'main', '[role="main"]', '.article-body', '.main-content', 
+    '#main-content', '#content', '.story-body', '.post-content'
+  ];
+  
+  const topLevelCandidates = Array.from(doc.querySelectorAll(commonSelectors.join(', ')));
+  
+  let bestCandidate: Element | null = null;
+  let maxCandidateLength = 0;
+
+  // Check top-level candidates
+  for (const candidate of topLevelCandidates) {
+    // Basic visibility check (skip hidden elements)
+    if ((candidate as HTMLElement).offsetParent === null) continue;
+
+    const flattened = flattenNode(candidate);
+    if (flattened) {
+      const text = flattened.textContent || '';
+      if (text.length > maxCandidateLength) {
+        maxCandidateLength = text.length;
+        bestCandidate = flattened as Element;
+      }
+    }
+  }
+
+  // If we found a good candidate, return it
+  if (bestCandidate && maxCandidateLength > 500) {
+    return sanitizeContent(bestCandidate.innerHTML);
+  }
+
+  // Fallback: Flatten the entire document body (expensive but comprehensive)
   const flattenedBody = flattenNode(doc.body) as HTMLElement;
 
   if (!flattenedBody) return '';

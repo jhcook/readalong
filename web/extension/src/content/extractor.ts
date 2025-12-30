@@ -80,7 +80,7 @@ export function extractContentFromNode(node: Node): string {
  * Calculates a content quality score for an element.
  * Higher is better.
  */
-function calculateScore(element: Element): number {
+function calculateScore(element: Element, pageTitle?: string): number {
   let score = 0;
 
   // 1. Base Text Length Score (1 point per 100 chars)
@@ -124,6 +124,16 @@ function calculateScore(element: Element): number {
       score -= 20;
   }
 
+  // 6. Title Match Bonus
+  if (pageTitle && pageTitle.length > 10) {
+     // Normalize spacing
+     const normalizedText = text.replace(/\s+/g, ' ').toLowerCase();
+     const normalizedTitle = pageTitle.replace(/\s+/g, ' ').toLowerCase();
+     if (normalizedText.includes(normalizedTitle)) {
+         score += 50; // Huge bonus for containing the page title
+     }
+  }
+
   return score;
 }
 
@@ -143,6 +153,13 @@ export function extractMainContent(doc: Document): string {
   let bestCandidate: Element | null = null;
   let maxScore = 0;
 
+  // Prepare Page Title for matching
+  // Strip common suffixes like " - MSN", " | Site Name"
+  let pageTitle = doc.title;
+  if (pageTitle) {
+      pageTitle = pageTitle.split(' - ')[0].split(' | ')[0].trim();
+  }
+
   // Check top-level candidates
   for (const candidate of topLevelCandidates) {
     // Basic visibility check (skip hidden elements)
@@ -151,7 +168,7 @@ export function extractMainContent(doc: Document): string {
     const flattened = flattenNode(candidate);
     if (flattened && flattened.nodeType === Node.ELEMENT_NODE) {
       const el = flattened as Element;
-      const score = calculateScore(el);
+      const score = calculateScore(el, pageTitle);
       
       if (score > maxScore) {
         maxScore = score;
@@ -186,7 +203,7 @@ export function extractMainContent(doc: Document): string {
 
   for (const container of candidates) {
     const el = container as HTMLElement;
-    const score = calculateScore(el);
+    const score = calculateScore(el, pageTitle);
     if (score > maxScore) {
       maxScore = score;
       bestElement = el;

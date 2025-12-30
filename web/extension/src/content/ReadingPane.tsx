@@ -818,7 +818,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                         key={wIdx}
                         className={`readalong-word ${isActive ? 'active' : ''}`}
                       >
-                        {word.text}{' '}
+                        {word.text}
                       </span>
                     );
                   })}

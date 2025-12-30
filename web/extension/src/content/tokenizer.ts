@@ -42,14 +42,36 @@ export function tokenizeText(text: string): AlignmentMap {
     const wordSegments = wordSegmenter.segment(sentenceText);
     const words: Word[] = [];
     let wordIndex = 0;
+    
+    let currentBuffer = '';
+    let bufferHasWord = false;
 
     for (const wordSegment of wordSegments) {
       if (wordSegment.isWordLike) {
-        words.push({
-          text: wordSegment.segment,
-          index: wordIndex++
-        });
+        if (bufferHasWord) {
+          // We already have a word in the buffer (and possibly trailing punct), flush it
+          words.push({
+            text: currentBuffer,
+            index: wordIndex++
+          });
+          currentBuffer = wordSegment.segment;
+        } else {
+          // Buffer was empty or had leading punct, just append
+          currentBuffer += wordSegment.segment;
+          bufferHasWord = true;
+        }
+      } else {
+        // Punctuation or whitespace
+        currentBuffer += wordSegment.segment;
       }
+    }
+
+    // Flush remaining
+    if (bufferHasWord) {
+      words.push({
+        text: currentBuffer,
+        index: wordIndex++
+      });
     }
 
     if (words.length > 0) {

@@ -64,7 +64,16 @@ function processAndMountContent(html: string) {
     if (text) {
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = text;
-      const plainText = tempDiv.textContent || tempDiv.innerText || '';
+
+      // Fix for line breaks: Append to body to make innerText layout-aware
+      // This collapses non-semantic newlines into spaces (white-space: normal)
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.whiteSpace = 'normal';
+      document.body.appendChild(tempDiv);
+
+      const plainText = tempDiv.innerText || '';
+      document.body.removeChild(tempDiv);
 
       // Store alignment map (AC4) - for now just in memory/processed
       const alignmentMap = tokenizeText(plainText);
@@ -175,7 +184,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // In a real scenario, we might map these tokens back to DOM nodes.
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = text;
-        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+
+        // Fix for line breaks: Append to body to make innerText layout-aware
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.whiteSpace = 'normal';
+        document.body.appendChild(tempDiv);
+
+        const plainText = tempDiv.innerText || '';
+        document.body.removeChild(tempDiv);
 
         // Store alignment map (AC4) - for now just in memory/processed
         const alignmentMap = tokenizeText(plainText);

@@ -1,9 +1,9 @@
 import { ExtractorRegistry } from './extractors/registry';
 import { sanitizeContent, cleanExtractedHtml, flattenNode } from './extractors/common';
-import { registerG8Extractors } from './extractors/g8_sites';
+import { registerG20Extractors } from './extractors/g20_sites';
 
-// Initialize the registry with G8 site configurations
-registerG8Extractors();
+// Initialize the registry with G20 site configurations
+registerG20Extractors();
 
 export { sanitizeContent, cleanExtractedHtml };
 

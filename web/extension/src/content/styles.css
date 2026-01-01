@@ -12,12 +12,18 @@
   --active-word-text: #000;
   --close-btn-color: #666;
   --close-btn-hover: #000;
+  /* Button Text (New) */
+  --control-btn-text: #222;
   --control-btn-bg: #e9ecef;
   --control-btn-hover: #dee2e6;
   /* Form Controls (New) */
   --input-bg: #fff;
   --input-text: #333;
   --input-border: #ced4da;
+  /* Menu Dropdown */
+  --menu-bg: #ffffff;
+  --menu-border: #dee2e6;
+  --menu-radius: 8px;
 
   position: fixed;
   top: 0;
@@ -45,12 +51,19 @@
   --word-radius: 10px;
   --active-word-bg: #E91E63;
   --active-word-text: white;
+  --active-word-text: white;
+  /* Button Text */
+  --control-btn-text: #E91E63;
   --control-btn-bg: #E1F5FE;
   --control-btn-hover: #B3E5FC;
   /* Form Controls */
   --input-bg: #fff;
   --input-text: #E91E63;
   --input-border: #B3E5FC;
+  /* Menu Dropdown */
+  --menu-bg: #fff0f5;
+  --menu-border: #E91E63;
+  --menu-radius: 16px;
 }
 
 /* Building Blocks Theme */
@@ -66,12 +79,18 @@
   --active-word-bg: #2196f3;
   /* Blue */
   --active-word-text: #fff;
+  /* Button Text */
+  --control-btn-text: #333;
   --control-btn-bg: #fff;
   --control-btn-hover: #ffcdd2;
   /* Form Controls */
   --input-bg: #fff;
   --input-text: #333;
   --input-border: #ff5252;
+  /* Menu Dropdown */
+  --menu-bg: #fff8e1;
+  --menu-border: #ff5252;
+  --menu-radius: 4px;
 }
 
 /* Academic Theme (Ivory Tower) */
@@ -88,6 +107,8 @@
   --active-word-bg: #C5E1A5;
   /* Light Green */
   --active-word-text: #000;
+  /* Button Text */
+  --control-btn-text: #3E2723;
   --control-btn-bg: #F5F5DC;
   /* Beige */
   --control-btn-hover: #E6E6FA;
@@ -95,6 +116,10 @@
   --input-bg: #fff;
   --input-text: #3E2723;
   --input-border: #EAE3D2;
+  /* Menu Dropdown */
+  --menu-bg: #FFFFF0;
+  --menu-border: #EAE3D2;
+  --menu-radius: 2px;
 }
 
 /* Minimal Theme (Plain/Unthemed) */
@@ -108,12 +133,18 @@
   --word-radius: 0;
   --active-word-bg: #eee;
   --active-word-text: #000;
+  /* Button Text */
+  --control-btn-text: #000;
   --control-btn-bg: #fff;
   --control-btn-hover: #eee;
   /* Form Controls */
   --input-bg: #fff;
   --input-text: #000;
   --input-border: #000;
+  /* Menu Dropdown */
+  --menu-bg: #ffffff;
+  --menu-border: #000;
+  --menu-radius: 0;
   /* Minimal specific overrides via specificity if needed, or rely on vars */
 }
 
@@ -160,6 +191,26 @@
   color: var(--close-btn-hover);
 }
 
+/* === Settings Menu Styles === */
+.readalong-settings-menu {
+  color: var(--text-color) !important;
+  /* Ensure text inherits from theme */
+  background-color: var(--menu-bg) !important;
+  border: 1px solid var(--menu-border) !important;
+  border-radius: var(--menu-radius) !important;
+  padding: 10px !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  min-width: 200px !important;
+  /* Positioning */
+  position: absolute !important;
+  top: 100% !important;
+  right: 40px !important;
+}
+
 .readalong-content {
   padding: 30px 40px;
   overflow-y: auto;
@@ -197,12 +248,18 @@
   --active-word-bg: #fff !important;
   --active-word-text: #000 !important;
   --border-color: #fff !important;
+  /* Button Text */
+  --control-btn-text: #fff !important;
   --control-btn-bg: #333 !important;
   --control-btn-hover: #555 !important;
   /* Form Controls Override */
   --input-bg: #000 !important;
   --input-text: #fff !important;
   --input-border: #fff !important;
+  /* Menu Dropdown Override */
+  --menu-bg: #000 !important;
+  --menu-border: #fff !important;
+  --menu-radius: 0 !important;
 }
 
 /* High Contrast Specifics requiring strict overrides */
@@ -217,7 +274,8 @@
 .readalong-control-btn {
   padding: 5px 10px;
   cursor: pointer;
-  background: var(--control-btn-bg);
+  background: var(--control-btn-bg) !important;
+  color: var(--control-btn-text) !important;
   border: 1px solid #ced4da;
   /* Keep border for structure */
   border-radius: 4px;
@@ -284,4 +342,31 @@
 .readalong-header.minimized h2 {
   font-size: 1.5rem;
   margin-right: 10px;
+}
+
+/* Form Controls */
+.readalong-settings-menu select,
+.readalong-settings-menu input[type="text"],
+.readalong-settings-menu input[type="password"] {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border: 1px solid var(--input-border) !important;
+  padding: 6px !important;
+  border-radius: 4px !important;
+  font-family: inherit;
+  font-size: 0.9rem !important;
+}
+
+.readalong-settings-menu select:focus,
+.readalong-settings-menu input:focus {
+  outline: 2px solid var(--active-word-bg) !important;
+  border-color: transparent !important;
+}
+
+/* Button Active State for settings toggles */
+.readalong-control-btn.active-toggle {
+  background-color: var(--active-word-bg);
+  color: var(--active-word-text);
+  border-color: var(--active-word-bg);
+  font-weight: bold;
 }

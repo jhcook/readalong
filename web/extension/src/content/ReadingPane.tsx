@@ -598,21 +598,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
             {/* Settings Menu Dropdown */}
             {isSettingsOpen && (
-              <div className="readalong-settings-menu" style={{
-                position: 'absolute',
-                top: '100%',
-                right: '40px',
-                background: '#fff',
-                border: '1px solid #ccc',
-                borderRadius: '8px',
-                padding: '10px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 1000,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                minWidth: '200px'
-              }}>
+              <div className="readalong-settings-menu">
                 <button onClick={toggleDyslexiaFont} className={`readalong-control-btn ${isDyslexiaFont ? 'active-toggle' : ''}`} style={{ width: '100%', textAlign: 'left' }}>
                   {isDyslexiaFont ? '✓ Dyslexia Font' : 'Dyslexia Font'}
                 </button>

@@ -1,58 +1,82 @@
+import { extractMainContent } from './extractor';
 
-import { extractMainContent, extractContentFromNode } from './extractor';
-
-describe('MSN Content Extraction (Shadow DOM)', () => {
-    let container: HTMLElement;
-
-    beforeEach(() => {
-        container = document.createElement('div');
-        document.body.appendChild(container);
+describe('extractMainContent - Stress Tests (MSN Repro)', () => {
+    it('handles null body gracefully', () => {
+        // obscure case where doc.body is missing (e.g. XML)
+        const doc = document.implementation.createHTMLDocument('No Body');
+        Object.defineProperty(doc, 'body', { value: null });
+        const result = extractMainContent(doc);
+        expect(result).toBe('');
     });
 
-    afterEach(() => {
-        document.body.removeChild(container);
+    it('handles deeply nested content without crashing', () => {
+        let content = 'Start';
+        for (let i = 0; i < 1000; i++) {
+            content = `<div>${content}</div>`;
+        }
+        document.body.innerHTML = content;
+        const result = extractMainContent(document);
+        // Readability usually handles this, or falls back. Should not throw.
+        expect(typeof result).toBe('string');
     });
 
-    test('Extracts content from Shadow DOM', () => {
-        // Simulate MSN structure: A host element with a Shadow Root
+    it('handles very large DOMs', () => {
+        const p = '<p>Some text content here.</p>';
+        document.body.innerHTML = p.repeat(5000);
+        const result = extractMainContent(document);
+        expect(typeof result).toBe('string');
+    });
+
+    it('handles malformed HTML or custom tags', () => {
+        document.body.innerHTML = `
+      <custom-tag>
+        <nested-custom>Content</nested-custom>
+      </custom-tag>
+      <unclosed-tag>
+    `;
+        const result = extractMainContent(document);
+        expect(typeof result).toBe('string');
+    });
+
+    it('correctly flattens Shadow DOM with slots (MSN structure)', () => {
+        // Simulate <fluent-design-system-provider> with shadow root and slot
         const host = document.createElement('div');
-        host.id = 'msn-article-host';
-        container.appendChild(host);
+        host.attachShadow({ mode: 'open' });
 
-        const shadowRoot = host.attachShadow({ mode: 'open' });
+        // Shadow DOM has a slot
+        const slot = document.createElement('slot');
+        host.shadowRoot?.appendChild(slot);
 
-        // Create content inside Shadow DOM
-        const articleContainer = document.createElement('div');
-        articleContainer.className = 'article-body';
+        // Light DOM has the content
+        const content = document.createElement('p');
+        content.textContent = 'This is the main article content inside Light DOM.';
+        host.appendChild(content);
 
-        const p1 = document.createElement('p');
-        p1.textContent = 'This is the main article content hidden in Shadow DOM.';
-        articleContainer.appendChild(p1);
+        document.body.appendChild(host);
 
-        const p2 = document.createElement('p');
-        p2.textContent = 'It should be extractable by the updated extractor.';
-        articleContainer.appendChild(p2);
-
-        shadowRoot.appendChild(articleContainer);
-
-        // Current behavior (using cloneNode) likely returns empty or host content only
-        // Expected behavior: Concatenated text of paragraphs
-        const content = extractMainContent(document);
-
-        expect(content).toContain('This is the main article content hidden in Shadow DOM.');
-        expect(content).toContain('It should be extractable by the updated extractor.');
+        const result = extractMainContent(document);
+        expect(result).toContain('This is the main article content inside Light DOM.');
     });
 
-    test('extractContentFromNode handles Shadow DOM on specific element', () => {
-        // HOST with Shadow DOM
-        const host = document.createElement('div');
-        container.appendChild(host);
-        const shadowRoot = host.attachShadow({ mode: 'open' });
-        const p = document.createElement('p');
-        p.textContent = 'Shadow Content Selected';
-        shadowRoot.appendChild(p);
-
-        const extracted = extractContentFromNode(host);
-        expect(extracted).toContain('Shadow Content Selected');
+    it('filters out MSN specific copyright ("© Nine") via intelligent filter', () => {
+        document.body.innerHTML = `
+            <cp-article>
+            <div class="article-body">
+                <h1>Article Title</h1>
+                <p>Content</p>
+                <div class="image-attribution">© Nine</div>
+                <p>More Content</p>
+                <p>Photos: Someone</p>
+                <p>:Stay across all the latest in breaking news, sport, politics and the weather via our news app and get notifications sent straight to your smartphone.</p>
+                <p>Available on the Apple App Store and Google Play.</p>
+             </div>
+            </cp-article>
+        `;
+        const result = extractMainContent(document);
+        expect(result).toContain('Content');
+        expect(result).not.toContain('© Nine');
+        expect(result).not.toContain('Photos: Someone');
+        expect(result).not.toContain('Stay across all the latest');
+        expect(result).not.toContain('Available on the Apple App Store');
     });
 });

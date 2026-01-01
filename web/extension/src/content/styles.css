@@ -14,6 +14,10 @@
   --close-btn-hover: #000;
   --control-btn-bg: #e9ecef;
   --control-btn-hover: #dee2e6;
+  /* Form Controls (New) */
+  --input-bg: #fff;
+  --input-text: #333;
+  --input-border: #ced4da;
 
   position: fixed;
   top: 0;
@@ -43,6 +47,10 @@
   --active-word-text: white;
   --control-btn-bg: #E1F5FE;
   --control-btn-hover: #B3E5FC;
+  /* Form Controls */
+  --input-bg: #fff;
+  --input-text: #E91E63;
+  --input-border: #B3E5FC;
 }
 
 /* Building Blocks Theme */
@@ -60,6 +68,10 @@
   --active-word-text: #fff;
   --control-btn-bg: #fff;
   --control-btn-hover: #ffcdd2;
+  /* Form Controls */
+  --input-bg: #fff;
+  --input-text: #333;
+  --input-border: #ff5252;
 }
 
 /* Academic Theme (Ivory Tower) */
@@ -79,6 +91,10 @@
   --control-btn-bg: #F5F5DC;
   /* Beige */
   --control-btn-hover: #E6E6FA;
+  /* Form Controls */
+  --input-bg: #fff;
+  --input-text: #3E2723;
+  --input-border: #EAE3D2;
 }
 
 /* Minimal Theme (Plain/Unthemed) */
@@ -94,6 +110,10 @@
   --active-word-text: #000;
   --control-btn-bg: #fff;
   --control-btn-hover: #eee;
+  /* Form Controls */
+  --input-bg: #fff;
+  --input-text: #000;
+  --input-border: #000;
   /* Minimal specific overrides via specificity if needed, or rely on vars */
 }
 
@@ -179,6 +199,10 @@
   --border-color: #fff !important;
   --control-btn-bg: #333 !important;
   --control-btn-hover: #555 !important;
+  /* Form Controls Override */
+  --input-bg: #000 !important;
+  --input-text: #fff !important;
+  --input-border: #fff !important;
 }
 
 /* High Contrast Specifics requiring strict overrides */

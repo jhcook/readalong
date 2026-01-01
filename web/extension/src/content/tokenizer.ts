@@ -1,13 +1,15 @@
 import { AlignmentMap, Sentence, Word } from './types';
 
 const ABBREVIATIONS = new Set([
-  'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'St.', 'Capt.', 'Col.', 'Gen.', 'Lt.', 'Sen.', 'Rep.'
+  'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'St.', 'Capt.', 'Col.', 'Gen.', 'Lt.', 'Sen.', 'Rep.',
+  'Jan.', 'Feb.', 'Mar.', 'Apr.', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Sept.', 'Oct.', 'Nov.', 'Dec.',
+  'Gov.', 'Rev.'
 ]);
 
 export function tokenizeText(text: string): AlignmentMap {
   const segmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
   const sentenceSegments = segmenter.segment(text);
-  
+
   let rawSentences: string[] = [];
   for (const seg of sentenceSegments) {
     if (seg.segment.trim()) {
@@ -42,7 +44,7 @@ export function tokenizeText(text: string): AlignmentMap {
     const wordSegments = wordSegmenter.segment(sentenceText);
     const words: Word[] = [];
     let wordIndex = 0;
-    
+
     let currentBuffer = '';
     let bufferHasWord = false;
 
@@ -52,15 +54,15 @@ export function tokenizeText(text: string): AlignmentMap {
           // Check for hyphenated word case (e.g. sub-agents)
           // If buffer ends in a hyphen (and not space), merge instead of flush
           if (currentBuffer.endsWith('-') && !/\s$/.test(currentBuffer)) {
-             currentBuffer += wordSegment.segment;
-             // Still has word, continue
+            currentBuffer += wordSegment.segment;
+            // Still has word, continue
           } else {
-             // Standard flush
-             words.push({
-               text: currentBuffer,
-               index: wordIndex++
-             });
-             currentBuffer = wordSegment.segment;
+            // Standard flush
+            words.push({
+              text: currentBuffer,
+              index: wordIndex++
+            });
+            currentBuffer = wordSegment.segment;
           }
         } else {
           // Buffer was empty or had leading punct, just append
@@ -72,18 +74,18 @@ export function tokenizeText(text: string): AlignmentMap {
         // Check if we should flush BEFORE adding this punctuation
         // e.g. "of " + "“" -> Flush "of " first.
         if (bufferHasWord && /\s$/.test(currentBuffer)) {
-             // Buffer has a word and ends in space. This punctuation likely starts a NEW word sequence.
-             // OR it is a separate punctuation mark.
-             // Flush "Word "
-             words.push({
-               text: currentBuffer,
-               index: wordIndex++
-             });
-             currentBuffer = wordSegment.segment;
-             bufferHasWord = false; 
+          // Buffer has a word and ends in space. This punctuation likely starts a NEW word sequence.
+          // OR it is a separate punctuation mark.
+          // Flush "Word "
+          words.push({
+            text: currentBuffer,
+            index: wordIndex++
+          });
+          currentBuffer = wordSegment.segment;
+          bufferHasWord = false;
         } else {
-             // Append (e.g. "word" + "," -> "word," or "sub" + "-" -> "sub-")
-             currentBuffer += wordSegment.segment;
+          // Append (e.g. "word" + "," -> "word," or "sub" + "-" -> "sub-")
+          currentBuffer += wordSegment.segment;
         }
       }
     }

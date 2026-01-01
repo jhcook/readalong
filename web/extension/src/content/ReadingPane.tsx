@@ -613,10 +613,10 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                 gap: '8px',
                 minWidth: '200px'
               }}>
-                <button onClick={toggleDyslexiaFont} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
+                <button onClick={toggleDyslexiaFont} className={`readalong-control-btn ${isDyslexiaFont ? 'active-toggle' : ''}`} style={{ width: '100%', textAlign: 'left' }}>
                   {isDyslexiaFont ? '✓ Dyslexia Font' : 'Dyslexia Font'}
                 </button>
-                <button onClick={toggleHighContrast} className="readalong-control-btn" style={{ width: '100%', textAlign: 'left' }}>
+                <button onClick={toggleHighContrast} className={`readalong-control-btn ${isHighContrast ? 'active-toggle' : ''}`} style={{ width: '100%', textAlign: 'left' }}>
                   {isHighContrast ? '✓ High Contrast' : 'High Contrast'}
                 </button>
 
@@ -626,7 +626,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                     id="theme-select"
                     value={theme}
                     onChange={(e) => setTheme(e.target.value as 'professional' | 'playful' | 'academic' | 'building-blocks' | 'minimal')}
-                    style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
                   >
                     <option value="professional">Professional (Office)</option>
                     <option value="minimal">Minimal (Plain)</option>
@@ -664,7 +663,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                     id="voice-source-select"
                     value={voiceSource}
                     onChange={(e) => setVoiceSource(e.target.value as 'system' | 'elevenlabs' | 'record')}
-                    style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
                   >
                     <option value="system">System Voices</option>
                     <option value="elevenlabs">ElevenLabs</option>
@@ -690,7 +688,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                       id="system-voice-select"
                       value={systemVoiceURI}
                       onChange={(e) => setSystemVoiceURI(e.target.value)}
-                      style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                      style={{ maxWidth: '200px' }}
                     >
                       <option value="">-- Auto-Detect --</option>
                       {voices.map(v => (
@@ -710,7 +708,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                         value={elevenLabsApiKey}
                         onChange={(e) => setElevenLabsApiKey(e.target.value)}
                         placeholder="sk-..."
-                        style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
                       />
                     </div>
 
@@ -728,7 +725,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                               id="cloned-voice-select"
                               value={selectedVoiceId}
                               onChange={(e) => setSelectedVoiceId(e.target.value)}
-                              style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                              style={{ maxWidth: '200px' }}
                             >
                               <option value="">-- Select Voice --</option>
                               {clonedVoices.map(v => (
@@ -752,7 +749,6 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                         value={googleApiKey}
                         onChange={(e) => setGoogleApiKey(e.target.value)}
                         placeholder="AIza..."
-                        style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
                       />
                     </div>
 
@@ -770,7 +766,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                               id="google-voice-select"
                               value={selectedGoogleVoiceName}
                               onChange={(e) => setSelectedGoogleVoiceName(e.target.value)}
-                              style={{ padding: '4px', borderRadius: '4px', border: '1px solid #ccc', maxWidth: '200px' }}
+                              style={{ maxWidth: '200px' }}
                             >
                               <option value="">-- Select Voice --</option>
                               {googleVoices

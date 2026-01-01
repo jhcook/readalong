@@ -71,6 +71,18 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [isDyslexiaFont, setIsDyslexiaFont] = useState<boolean>(false);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
 
+  // Search State
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchMatches, setSearchMatches] = useState<number[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(-1);
+
+  // Ignore Content State
+  const [ignoredSentenceIndices, setIgnoredSentenceIndices] = useState<Set<number>>(new Set());
+  const [lastInteractionIndex, setLastInteractionIndex] = useState<number | null>(null);
+
+  // Refs for scrolling to matches
+  const matchRefs = useRef<(HTMLParagraphElement | null)[]>([]);
+
   // Auto-scroll ref
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -262,6 +274,191 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     return alignmentMap.sentences.flatMap(s => s.words);
   }, [alignmentMap]);
 
+  // Map Word object to its Global Index in allWords
+  // This is crucial because word.index is local to the sentence (0..N),
+  // but currentWordIndex state represents the index in allWords (0..Total).
+  const wordToGlobalIndex = React.useMemo(() => {
+    const map = new Map<Word, number>();
+    allWords.forEach((w, i) => map.set(w, i));
+    return map;
+  }, [allWords]);
+
+  // Active Alignment Map (Filtering Ignored)
+  // Returns { alignment, filteredToGlobalIndexMap }
+  const activeAlignmentResult = React.useMemo(() => {
+    if (!alignmentMap) return undefined;
+    // If nothing ignored, return original
+    if (ignoredSentenceIndices.size === 0) {
+      return {
+        alignment: alignmentMap,
+        filteredToGlobalIndexMap: alignmentMap.sentences.map((_, i) => i)
+      };
+    }
+
+    // Filter sentences. Note: We must preserve logic for 'allWords' if we want global highlighting to stay consistent.
+    // But for playback, we want to skip.
+    // The Provider uses this map to generate audio / speak.
+
+    // Build mapping from Filtered Index -> Global Index
+    let filteredToGlobal: number[] = [];
+    const filteredSentences = alignmentMap.sentences.filter((_, idx) => {
+      if (!ignoredSentenceIndices.has(idx)) {
+        filteredToGlobal.push(idx);
+        return true;
+      }
+      return false;
+    });
+
+    return {
+      alignment: {
+        ...alignmentMap,
+        sentences: filteredSentences
+      },
+      filteredToGlobalIndexMap: filteredToGlobal
+    };
+  }, [alignmentMap, ignoredSentenceIndices]);
+
+  const activeAlignmentMap = activeAlignmentResult?.alignment;
+  const filteredToGlobalIndexMap = activeAlignmentResult?.filteredToGlobalIndexMap;
+
+  // Search Logic
+  useEffect(() => {
+    if (!searchQuery.trim() || !alignmentMap) {
+      setSearchMatches([]);
+      setCurrentMatchIndex(-1);
+      return;
+    }
+    const query = searchQuery.toLowerCase();
+    const matches: number[] = [];
+    alignmentMap.sentences.forEach((s, idx) => {
+      if (s.text.toLowerCase().includes(query)) {
+        matches.push(idx);
+      }
+    });
+    setSearchMatches(matches);
+    if (matches.length > 0) {
+      setCurrentMatchIndex(0);
+      // Auto-scroll to first match?
+    } else {
+      setCurrentMatchIndex(-1);
+    }
+  }, [searchQuery, alignmentMap]);
+
+  // Scroll to current match
+  useEffect(() => {
+    if (currentMatchIndex >= 0 && searchMatches.length > 0) {
+      const sentenceIndex = searchMatches[currentMatchIndex];
+      const el = matchRefs.current[sentenceIndex];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [currentMatchIndex, searchMatches]);
+
+  const handleSearchNext = () => {
+    if (searchMatches.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev + 1) % searchMatches.length);
+  };
+
+  const handleSearchPrev = () => {
+    if (searchMatches.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev - 1 + searchMatches.length) % searchMatches.length);
+  };
+
+  const toggleIgnore = (sIdx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Check for Text Selection Range
+    // Check for Text Selection Range
+    let selection: Selection | null = null;
+
+    // Try to get selection from Shadow Root first
+    if (containerRef.current) {
+      const root = containerRef.current.getRootNode();
+      // Cast to any because TS might not know getSelection exists on ShadowRoot yet
+      if (root instanceof ShadowRoot && (root as any).getSelection) {
+        selection = (root as any).getSelection();
+      }
+    }
+
+    // Fallback to window selection
+    if (!selection) {
+      selection = window.getSelection();
+    }
+
+    let selectionHandled = false;
+    let next = new Set(ignoredSentenceIndices); // Prepare next state based on current
+
+    if (selection && !selection.isCollapsed) {
+      // We have a selection. Let's find the start and end paragraphs.
+      // We look for elements with data-sentence-index.
+
+      let startNode = selection.anchorNode;
+      let endNode = selection.focusNode;
+
+      // Helper to find parent with data-sentence-index
+      const findSentenceIndex = (node: Node | null): number | null => {
+        let curr = node;
+        while (curr) {
+          if (curr instanceof HTMLElement && curr.hasAttribute('data-sentence-index')) {
+            return parseInt(curr.getAttribute('data-sentence-index') || '-1', 10);
+          }
+          curr = curr.parentNode;
+        }
+        return null;
+      };
+
+      const startIdxPos = findSentenceIndex(startNode);
+      const endIdxPos = findSentenceIndex(endNode);
+
+      if (startIdxPos !== null && endIdxPos !== null && startIdxPos !== -1 && endIdxPos !== -1) {
+        selectionHandled = true;
+        const rangeStart = Math.min(startIdxPos, endIdxPos);
+        const rangeEnd = Math.max(startIdxPos, endIdxPos);
+
+        // Determine intent: matches the button click target (sIdx)
+        // If target (sIdx) is ignored, un-ignore range.
+        // If target is NOT ignored, ignore range.
+        const isTargetIgnored = ignoredSentenceIndices.has(sIdx);
+        const shouldIgnore = !isTargetIgnored;
+
+        for (let i = rangeStart; i <= rangeEnd; i++) {
+          if (shouldIgnore) next.add(i);
+          else next.delete(i);
+        }
+
+        // Clear selection
+        selection.removeAllRanges();
+      }
+    }
+
+    if (!selectionHandled) {
+      // Fallback to Shift-Click or Single Click
+      if (e.shiftKey && lastInteractionIndex !== null) {
+        const start = Math.min(lastInteractionIndex, sIdx);
+        const end = Math.max(lastInteractionIndex, sIdx);
+
+        const isCurrentlyIgnored = ignoredSentenceIndices.has(sIdx);
+        const shouldIgnore = !isCurrentlyIgnored;
+
+        for (let i = start; i <= end; i++) {
+          if (shouldIgnore) {
+            next.add(i);
+          } else {
+            next.delete(i);
+          }
+        }
+      } else {
+        // Normal single toggle
+        if (next.has(sIdx)) next.delete(sIdx);
+        else next.add(sIdx);
+      }
+    }
+
+    setLastInteractionIndex(sIdx);
+    setIgnoredSentenceIndices(next);
+  };
+
 
   // --- Recording Logic --- //
   const toggleRecording = async () => {
@@ -333,7 +530,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   // --- Playback Control --- //
 
   const initProvider = () => {
-    if (!alignmentMap) return null;
+    if (!activeAlignmentMap) return null;
 
     // Clear existing
     if (readingProvider.current) {
@@ -345,7 +542,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     // 1. ElevenLabs
     if (voiceSource === 'elevenlabs') {
       if (elevenLabsApiKey && selectedVoiceId) {
-        provider = new ElevenLabsProvider(alignmentMap, elevenLabsApiKey, selectedVoiceId);
+        provider = new ElevenLabsProvider(activeAlignmentMap, elevenLabsApiKey, selectedVoiceId);
       } else {
         console.warn("ElevenLabs selected but missing config.");
         alert("Please configure ElevenLabs API Key and Voice in Settings.");
@@ -356,7 +553,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     else if (voiceSource === 'google') {
       const selectedVoice = googleVoices.find(v => v.name === selectedGoogleVoiceName);
       if (googleApiKey && selectedVoice) {
-        provider = new GoogleProvider(alignmentMap, googleApiKey, selectedVoice);
+        provider = new GoogleProvider(activeAlignmentMap, googleApiKey, selectedVoice);
       } else {
         console.warn("Google selected but missing config.");
         alert("Please configure Google Cloud API Key and Voice in Settings.");
@@ -366,7 +563,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     // 3. Recorded Audio
     else if (voiceSource === 'record') {
       if (recordedAudioUrl) {
-        provider = new RecordedProvider(recordedAudioUrl, alignmentMap);
+        provider = new RecordedProvider(recordedAudioUrl, activeAlignmentMap);
       } else {
         // If selected but no audio, maybe just do nothing or alert? 
         // Realistically, user selects "Record" option to SEE the button, then records.
@@ -376,7 +573,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     }
     // 4. System TTS
     else {
-      const sysProvider = new SystemProvider(alignmentMap);
+      const sysProvider = new SystemProvider(activeAlignmentMap);
       // Set voice
       const preferredVoice = voices.find(v => v.voiceURI === systemVoiceURI) ||
         voices.find(v => v.localService && v.lang.startsWith('en')) ||
@@ -388,7 +585,59 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
     if (provider) {
       // Hook up callbacks
-      provider.onWordBoundary = (idx) => setCurrentWordIndex(idx);
+      provider.onWordBoundary = (idx) => {
+        // Fix: Convert filtered work/sentence index to global if needed?
+        // The provider's "idx" is the global word index relative to ITS alignment map.
+        // If the map is filtered, we need to map back to original for UI highlighting.
+
+        if (filteredToGlobalIndexMap && activeAlignmentMap) {
+          // idx is word index in the filtered text.
+          // We need to find which sentence this word belongs to in filtered map,
+          // get that sentence's global index via filteredToGlobalIndexMap,
+          // then find the corresponding word's global index.
+
+          // This is expensive to do on every word boundary if not optimized.
+          // Optimization: Pre-calculate word-to-word mapping or just sentence mapping.
+          // Simpler: The filtered map's sentences are subsets.
+          // Let's find the sentence in activeAlignmentMap
+
+          // Wait, 'idx' from provider is typically Word Index in the flattened list.
+          // Let's verify 'types.ts'. Yup, typically flattened index.
+          // So we need a map from FilteredWordIndex -> GlobalWordIndex.
+
+          const filteredSentences = activeAlignmentMap.sentences;
+          let wordCount = 0;
+          let foundSentenceIdx = -1;
+          let wordOffsetInSentence = -1;
+
+          for (let i = 0; i < filteredSentences.length; i++) {
+            const sLen = filteredSentences[i].words.length;
+            if (idx < wordCount + sLen) {
+              foundSentenceIdx = i;
+              wordOffsetInSentence = idx - wordCount;
+              break;
+            }
+            wordCount += sLen;
+          }
+          if (foundSentenceIdx !== -1) {
+            const globalSentenceIdx = filteredToGlobalIndexMap[foundSentenceIdx];
+            if (typeof globalSentenceIdx === 'number') {
+              const globalSentence = alignmentMap?.sentences[globalSentenceIdx];
+              // globalSentence.words[wordOffsetInSentence] is the specific Word object we want.
+              // We need its GLOBAL index (in allWords).
+              if (globalSentence && globalSentence.words[wordOffsetInSentence]) {
+                const targetWord = globalSentence.words[wordOffsetInSentence];
+                const globalIdx = wordToGlobalIndex.get(targetWord);
+                if (globalIdx !== undefined) {
+                  setCurrentWordIndex(globalIdx);
+                  return;
+                }
+              }
+            }
+          }
+        }
+
+      };
       provider.onStateChange = (playing, loading) => {
         setIsPlaying(playing);
         setIsLoadingAudio(loading); // Update loading state
@@ -414,15 +663,49 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       return;
     }
 
-    // If not initialized or we want to re-init (e.g. settings changed), init logic.
-    // For simplicity, we can re-init provider every time user clicks Read Aloud from start.
-    // Or check if valid.
+    // Map global index to filtered index if needed?
+    // Providers using activeAlignmentMap will see a reduced list.
+    // If startSentenceIndex corresponds to the GLOBAL index (from UI click),
+    // and that sentence is IGNORED, we shouldn't play it?
+    // Or we find the nearest non-ignored sentence.
+
+    // Convert global index to filtered index
+    let filteredStartIndex = 0;
+    if (ignoredSentenceIndices.size > 0 && activeAlignmentMap) {
+      // Find which sentence in activeAlignmentMap corresponds to activeAlignmentMap.sentences[?] 
+      // Wait, activeAlignmentMap.sentences contains the subset.
+      // We need to find the index IN THAT SUBSET that matches the sentence at startSentenceIndex in global.
+      const targetSentence = alignmentMap?.sentences[startSentenceIndex];
+      if (targetSentence) {
+        const foundIndex = activeAlignmentMap.sentences.indexOf(targetSentence);
+        if (foundIndex !== -1) {
+          filteredStartIndex = foundIndex;
+        } else {
+          // The sentence is ignored. Find next available?
+          // Simple approach: start from 0 if ignored, or find next.
+          // Let's iterate forward from startSentenceIndex until we find one not ignored.
+          let nextValidObj = null;
+          for (let i = startSentenceIndex; i < (alignmentMap?.sentences.length || 0); i++) {
+            if (!ignoredSentenceIndices.has(i)) {
+              nextValidObj = alignmentMap?.sentences[i];
+              break;
+            }
+          }
+          if (nextValidObj) {
+            filteredStartIndex = activeAlignmentMap.sentences.indexOf(nextValidObj);
+          }
+        }
+      }
+    } else {
+      // If nothing ignored, these are same
+      filteredStartIndex = startSentenceIndex;
+    }
 
     // We re-init to capture settings changes.
     const provider = initProvider();
     if (provider) {
       setIsPaused(false);
-      provider.play(startSentenceIndex);
+      provider.play(filteredStartIndex);
     }
   };
 
@@ -461,9 +744,8 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       // 1. Find Current Sentence
       let currentSentenceIndex = -1;
       if (currentWordIndex !== -1) {
-        currentSentenceIndex = alignmentMap.sentences.findIndex(s =>
-          s.words.some(w => w === allWords[currentWordIndex])
-        );
+        const currentWord = allWords[currentWordIndex];
+        currentSentenceIndex = alignmentMap.sentences.findIndex(s => s.words.includes(currentWord));
       }
 
       // If not found, start at 0? 
@@ -485,7 +767,8 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       // We can find the first word of target chunk and set it.
       const targetSentence = alignmentMap.sentences[targetIndex];
       if (targetSentence.words.length > 0) {
-        setCurrentWordIndex(targetSentence.words[0].index); // Assuming .index is global as per types usage in ReadingPane
+        const gIdx = wordToGlobalIndex.get(targetSentence.words[0]);
+        if (gIdx !== undefined) setCurrentWordIndex(gIdx);
       }
 
       debounceTimerRef.current = setTimeout(() => {
@@ -535,13 +818,50 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
           </h2>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', position: 'relative' }}>
             {!isMinimized && allWords.length > 0 && !isPlaying && !isLoadingAudio && (
-              <button
-                className="readalong-control-btn"
-                onClick={() => handleReadAloud(0)}
-                title="Read Aloud"
-              >
-                Read Aloud
-              </button>
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <button
+                  className="readalong-control-btn"
+                  onClick={() => {
+                    // If we have a selected sentence (via click), start from there.
+                    // Otherwise start from 0.
+                    // We use the currentWordIndex (which is global) to find the sentence index.
+                    let startIdx = 0;
+                    if (currentWordIndex >= 0 && alignmentMap) {
+                      // Find the sentence containing the word at allWords[currentWordIndex]
+                      const currentWord = allWords[currentWordIndex];
+                      const sIndex = alignmentMap.sentences.findIndex(s => s.words.includes(currentWord));
+                      if (sIndex !== -1) startIdx = sIndex;
+                    }
+                    handleReadAloud(startIdx);
+                  }}
+                  title="Read Aloud"
+                >
+                  {isPlaying ? "Restart" : "Read Aloud"}
+                </button>
+                {/* Search Input inline? Or toggle? Let's put inline for simplicity */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Find..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ccc',
+                      fontSize: '0.9rem',
+                      width: '120px'
+                    }}
+                  />
+                  {searchMatches.length > 0 && (
+                    <span style={{ fontSize: '0.7rem', marginLeft: '4px', color: '#666' }}>
+                      {currentMatchIndex + 1}/{searchMatches.length}
+                    </span>
+                  )}
+                  <button onClick={handleSearchPrev} disabled={searchMatches.length === 0} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>⬆️</button>
+                  <button onClick={handleSearchNext} disabled={searchMatches.length === 0} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>⬇️</button>
+                </div>
+              </div>
             )}
 
             {isLoadingAudio && (
@@ -779,33 +1099,83 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         {!isMinimized && (
           <div className="readalong-content" ref={containerRef}>
             {alignmentMap ? (
-              alignmentMap.sentences.map((sentence, sIdx) => (
-                <p key={sIdx}>
-                  {sentence.words.map((word, wIdx) => {
-                    const isCurrentWord = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
-                    let isActive = isCurrentWord;
+              alignmentMap.sentences.map((sentence, sIdx) => {
+                const isIgnored = ignoredSentenceIndices.has(sIdx);
+                const isSearchMatch = searchMatches.includes(sIdx);
+                const isSearchActive = isSearchMatch && currentMatchIndex !== -1 && searchMatches[currentMatchIndex] === sIdx;
 
-                    // Fallback: If using a "dumb" voice (no word boundaries), highlight the whole sentence
-                    // if the current word pointer is anywhere in this sentence.
-                    if (isSentenceHighlightMode && currentWordIndex >= 0) {
-                      const currentGlobalWord = allWords[currentWordIndex];
-                      // Check if the word currently being spoken is part of this sentence
-                      if (sentence.words.includes(currentGlobalWord)) {
-                        isActive = true;
+                return (
+                  <p
+                    key={sIdx}
+                    ref={el => matchRefs.current[sIdx] = el}
+                    data-sentence-index={sIdx}
+                    className={`${isIgnored ? 'ignored-block' : ''}`}
+                    onClick={(e) => {
+                      // User story update:
+                      // If PLAYING: Jump to this sentence and continue playing.
+                      // If NOT PLAYING: Just highlight/select this sentence (set currentWordIndex to start).
+
+                      if (isIgnored) return;
+
+                      if (isPlaying) {
+                        handleReadAloud(sIdx);
+                      } else {
+                        // Just select visually
+                        if (sentence.words.length > 0) {
+                          // Set to global index of the first word
+                          const firstWord = sentence.words[0];
+                          const globalIdx = wordToGlobalIndex.get(firstWord);
+                          if (globalIdx !== undefined) {
+                            setCurrentWordIndex(globalIdx);
+                          }
+                        }
                       }
-                    }
+                    }}
+                    title={isIgnored ? "Ignored (Click 'Ignore' to restore)" : (isPlaying ? "Click to jump here" : "Click to select (Press Play to start)")}
+                  >
+                    <button
+                      className="ignore-btn"
+                      onMouseDown={(e) => {
+                        // Prevent default to ensure selection is NOT cleared
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onMouseUp={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => toggleIgnore(sIdx, e)}
+                      title={isIgnored ? "Restore" : "Ignore"}
+                    >
+                      {isIgnored ? "👁️" : "🚫"}
+                    </button>
 
-                    return (
-                      <span
-                        key={wIdx}
-                        className={`readalong-word ${isActive ? 'active' : ''}`}
-                      >
-                        {word.text}
-                      </span>
-                    );
-                  })}
-                </p>
-              ))
+                    {sentence.words.map((word, wIdx) => {
+                      const isCurrentWord = currentWordIndex >= 0 && allWords[currentWordIndex] === word;
+                      let isActive = isCurrentWord;
+
+                      // Fallback: If using a "dumb" voice (no word boundaries), highlight the whole sentence
+                      // if the current word pointer is anywhere in this sentence.
+                      if (isSentenceHighlightMode && currentWordIndex >= 0) {
+                        const currentGlobalWord = allWords[currentWordIndex];
+                        // Check if the word currently being spoken is part of this sentence
+                        if (sentence.words.includes(currentGlobalWord)) {
+                          isActive = true;
+                        }
+                      }
+
+                      return (
+                        <span
+                          key={wIdx}
+                          className={`readalong-word ${isActive ? 'active' : ''} ${isIgnored ? 'ignored' : ''} ${isSearchMatch ? 'search-match' : ''} ${isSearchActive ? 'active' : ''}`}
+                        >
+                          {word.text}
+                        </span>
+                      );
+                    })}
+                  </p>
+                );
+              })
             ) : (
               <div dangerouslySetInnerHTML={{ __html: text || '' }} />
             )}

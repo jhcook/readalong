@@ -370,3 +370,66 @@
   border-color: var(--active-word-bg);
   font-weight: bold;
 }
+
+/* Search Highlights */
+.readalong-word.search-match {
+  background-color: #ffe0b2; /* Light Orange */
+}
+
+.readalong-word.search-match.active {
+  background-color: #ff9800; /* Orange */
+  color: white;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+
+/* Ignored Content */
+.readalong-word.ignored {
+  opacity: 0.4;
+  text-decoration: line-through;
+  filter: grayscale(100%);
+}
+
+.readalong-content p {
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.readalong-content p:hover {
+  background-color: rgba(0,0,0,0.03);
+}
+
+.readalong-content p.ignored-block {
+     opacity: 0.5;
+     background-color: rgba(0,0,0,0.05);
+}
+
+/* Ignore Button (Contextual) */
+.ignore-btn {
+    position: absolute;
+    right: -30px;
+    top: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.readalong-content p:hover .ignore-btn {
+    opacity: 1;
+}
+
+.high-contrast .readalong-word.search-match {
+    background-color: #004d40;
+    color: #fff;
+    outline: 2px dashed #fff;
+}
+
+.high-contrast .readalong-word.search-match.active {
+    background-color: #00897b;
+    outline: 2px solid #fff;
+}

@@ -5,7 +5,7 @@ Gemini must treat `.agent/` as the authoritative governance system for this
 entire monorepo.
 
 ## Core Directives
-- No code generation unless a Story in `.agent/stories/` is in COMMITTED state.
+- No code generation unless a Story in `.agent/cache/stories/` is in COMMITTED state.
 - Enforce all ADRs in `.agent/adrs/`.
 - Enforce architecture + compliance guardrails.
 - Follow workflows in `.agent/workflows/`.

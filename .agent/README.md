@@ -25,8 +25,8 @@ We follow a strict **Story-Driven Development** workflow:
 
 *   `bin/`: The CLI executable.
 *   `agents.yaml`: Definitions of the "Governance Panel" roles.
-*   `stories/`: User Stories organized by scope (`INFRA/`, `WEB/`, `MOBILE/`, `BACKEND/`).
-*   `plans/`: High-level plans for complex initiatives.
+*   `cache/stories/`: User Stories organized by scope (`INFRA/`, `WEB/`, `MOBILE/`, `BACKEND/`).
+*   `cache/plans/`: High-level plans for complex initiatives.
 *   `adrs/`: Architecture Decision Records (immutable design documents).
 *   `compliance/`: Checklists for SOC2, GDPR, etc.
 
@@ -42,8 +42,8 @@ chmod +x .agent/bin/agent
 ### Creating Work
 **Create a new Story:**
 ```bash
-./.agent/bin/agent new-story
-# Select category (e.g., WEB) and enter ID (e.g., 001) -> Creates .agent/stories/WEB/WEB-001.md
+.agent/bin/agent new-story
+# Select category (e.g., WEB) and enter ID (e.g., 001) -> Creates .agent/cache/stories/WEB/WEB-001.md
 ```
 
 **Create a new Plan (for specific large features):**

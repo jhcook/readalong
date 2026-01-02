@@ -14,7 +14,7 @@ export interface AudioChunk {
 }
 
 export class ChunkManager {
-    static createChunks(alignmentMap: AlignmentMap, maxChars: number = 2500): AudioChunk[] {
+    static createChunks(alignmentMap: AlignmentMap, maxChars: number = 600): AudioChunk[] {
         const chunks: AudioChunk[] = [];
         let currentChunkSentences: Sentence[] = [];
         let currentChunkTextLength = 0;

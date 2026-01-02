@@ -9,6 +9,42 @@ Convert a Story (requirements) into an Implementation Runbook (blueprint) that e
 2.  No regression of existing features
 3.  Adherence to the Story's requirements
 4.  Safe, step-by-step execution
+5. Component Specification & Interface
+API Definition: Define clear entry and exit points (REST, gRPC, or GraphQL). Use OpenAPI/Swagger specs to define request/response schemas.
+
+Data Models: Specify the core entities and DTOs (Data Transfer Objects) the component will handle.
+
+Dependency Injection: List external services, databases, or third-party APIs the component must interact with.
+
+State Management: Explicitly state if the component is stateless or if it must manage internal state/persistence.
+
+6. Implementation Guardrails
+Tech Stack Standards: Mandate the language version (e.g., Python 3.12+), framework (FastAPI/Next.js), and linting/formatting rules (Ruff, Prettier).
+
+Error Handling Strategy: Define standard error codes (e.g., using RFC 7807 Problem Details) and how the component should fail gracefully.
+
+Security Requirements: Specify authentication (OAuth2/OIDC) and authorization (RBAC/ABAC) requirements, including secrets management via Vault or Google Secret Manager.
+
+7. Logic & Design Patterns
+Architectural Pattern: Require a specific structure (e.g., Hexagonal Architecture or Clean Architecture) to separate business logic from infrastructure.
+
+Concurrency & Scaling: Outline how the component handles asynchronous tasks (e.g., Celery, BullMQ) and its expected behavior under high load.
+
+Idempotency: For components handling writes or payments, define how to handle retries without duplicating actions.
+
+8. Quality & Observability
+Testing Requirements: Set a minimum threshold for unit test coverage (e.g., 80%) and define mandatory integration test scenarios.
+
+Logging Schema: Enforce structured logging (JSON) with specific fields like correlation_id, user_id, and environment.
+
+Metrics & Health Checks: Define the standard endpoints (e.g., /healthz, /metrics) for Prometheus/Grafana monitoring.
+
+9. Deployment & Lifecycle
+CI/CD Pipeline: Detail the required GitHub Actions or GitLab CI steps for building, scanning (Snyk/Trivy), and deploying the component.
+
+Infrastructure as Code (IaC): Provide a template (Terraform or Pulumi) for the cloud resources the component requires.
+
+Documentation: Require updated or new automated documentation for all internal logic.
 
 ## GENERATION PROCESS
 

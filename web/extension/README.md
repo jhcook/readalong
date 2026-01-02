@@ -10,6 +10,23 @@ The extension is built using Webpack and TypeScript.
 
 - Node.js and npm installed.
 
+### Google Cloud Setup (Optional)
+
+To use high-quality Google Cloud voices (WaveNet, Neural2, Chirp) and the ReadAlong STT Round-Trip feature, you must configure a Google Cloud Project:
+
+1.  **Create a Project**: Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+2.  **Enable APIs**:
+    *   **Cloud Text-to-Speech API**: Required for generating audio.
+    *   **Cloud Speech-to-Text API**: **CRITICAL** for "Chirp 3" (HD) voices to support word-level highlighting (Round-Trip).
+3.  **Create Service Account**:
+    *   Go to **IAM & Admin > Service Accounts**.
+    *   Create a new service account.
+    *   Grant the role **"Cloud Text-to-Speech API User"** AND **"Cloud Speech-to-Text API User"**.
+    *   Create a JSON key for this account and download it.
+4.  **Configure Extension**:
+    *   Open the ReadAlong Extension Options page.
+    *   Upload the downloaded JSON key file in the "Google Cloud" section.
+
 ### Setup
 
 1.  Navigate to this directory:

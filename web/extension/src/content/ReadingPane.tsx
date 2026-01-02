@@ -190,26 +190,31 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
   // Fetch ElevenLabs voices
   useEffect(() => {
-    if (elevenLabsApiKey && isSettingsOpen && voiceSource === 'elevenlabs') {
+    if (elevenLabsApiKey && settingsLoaded && voiceSource === 'elevenlabs') {
       const trimmedKey = elevenLabsApiKey.trim();
       if (!trimmedKey) return;
 
       setIsLoadingVoices(true);
       setVoiceFetchError(null);
-      ElevenLabsClient.getVoices(trimmedKey)
-        .then(voices => setClonedVoices(voices))
-        .catch(err => {
-          console.error("Failed to load voices", err);
-          setVoiceFetchError(typeof err === 'string' ? err : (err.message || String(err)));
-        })
-        .finally(() => setIsLoadingVoices(false));
+      const promise = ElevenLabsClient.getVoices(trimmedKey);
+      if (promise && typeof promise.then === 'function') {
+        promise
+          .then(voices => setClonedVoices(voices))
+          .catch(err => {
+            console.error("Failed to load voices", err);
+            setVoiceFetchError(typeof err === 'string' ? err : (err.message || String(err)));
+          })
+          .finally(() => setIsLoadingVoices(false));
+      } else {
+        setIsLoadingVoices(false);
+      }
     }
 
-  }, [elevenLabsApiKey, isSettingsOpen, voiceSource]);
+  }, [elevenLabsApiKey, settingsLoaded, voiceSource]);
 
   // Fetch Google voices (supports API Key or Service Account)
   useEffect(() => {
-    if (isSettingsOpen && voiceSource === 'google') {
+    if (settingsLoaded && voiceSource === 'google') {
       // We no longer check valid keys here, we assume background will error if missing.
       // Or we could check if storage has them? But reading storage async is messy here.
       // Let's rely on GoogleClient returning error if auth fails in background.
@@ -217,33 +222,43 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       setIsLoadingGoogleVoices(true);
       setGoogleVoiceError(null);
 
-      GoogleClient.getVoices()
-        .then((voices: GoogleVoice[]) => setGoogleVoices(voices))
-        .catch((err: any) => {
-          console.error("Failed to load google voices", err);
-          setGoogleVoiceError(typeof err === 'string' ? err : (err.message || String(err)));
-        })
-        .finally(() => setIsLoadingGoogleVoices(false));
+      const promise = GoogleClient.getVoices();
+      if (promise && typeof promise.then === 'function') {
+        promise
+          .then((voices: GoogleVoice[]) => setGoogleVoices(voices))
+          .catch((err: any) => {
+            console.error("Failed to load google voices", err);
+            setGoogleVoiceError(typeof err === 'string' ? err : (err.message || String(err)));
+          })
+          .finally(() => setIsLoadingGoogleVoices(false));
+      } else {
+        setIsLoadingGoogleVoices(false);
+      }
     }
-  }, [googleAuthMode, isSettingsOpen, voiceSource]);
+  }, [googleAuthMode, settingsLoaded, voiceSource]);
 
   // Fetch Resemble voices
   useEffect(() => {
-    if (resembleApiKey && isSettingsOpen && voiceSource === 'resemble') {
+    if (resembleApiKey && settingsLoaded && voiceSource === 'resemble') {
       const trimmedKey = resembleApiKey.trim();
       if (!trimmedKey) return;
 
       setIsLoadingResembleVoices(true);
       setResembleVoiceError(null);
-      ResembleClient.getVoices(trimmedKey)
-        .then((voices: ResembleVoice[]) => setResembleVoices(voices))
-        .catch((err: any) => {
-          console.error("Failed to load resemble voices", err);
-          setResembleVoiceError(typeof err === 'string' ? err : (err.message || String(err)));
-        })
-        .finally(() => setIsLoadingResembleVoices(false));
+      const promise = ResembleClient.getVoices(trimmedKey);
+      if (promise && typeof promise.then === 'function') {
+        promise
+          .then((voices: ResembleVoice[]) => setResembleVoices(voices))
+          .catch((err: any) => {
+            console.error("Failed to load resemble voices", err);
+            setResembleVoiceError(typeof err === 'string' ? err : (err.message || String(err)));
+          })
+          .finally(() => setIsLoadingResembleVoices(false));
+      } else {
+        setIsLoadingResembleVoices(false);
+      }
     }
-  }, [resembleApiKey, isSettingsOpen, voiceSource]);
+  }, [resembleApiKey, settingsLoaded, voiceSource]);
 
   // Save settings when they change, and STOP playback to prevent ghost voices
   useEffect(() => {

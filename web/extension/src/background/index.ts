@@ -574,9 +574,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 4. Fetch Audio Data (for fallback playback in Content Script)
     if (message.type === 'FETCH_AUDIO') {
         const { audioId } = message;
+        console.log('[Background] FETCH_AUDIO request for:', audioId);
         (async () => {
             try {
                 const cachedData = await audioCache.getAudio(audioId);
+                console.log('[Background] FETCH_AUDIO: Cache hit?', !!cachedData);
                 if (!cachedData) {
                     sendResponse({ success: false, error: 'Audio not found in cache' });
                     return;
@@ -585,10 +587,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 // Convert Blob to Base64/DataURL
                 const reader = new FileReader();
                 reader.onloadend = () => {
+                    console.log('[Background] FETCH_AUDIO: FileReader success. Sending response.');
                     const base64data = reader.result as string;
                     sendResponse({ success: true, audioData: base64data });
                 };
                 reader.onerror = () => {
+                    console.error('[Background] FETCH_AUDIO: FileReader error');
                     sendResponse({ success: false, error: 'Failed to read blob' });
                 };
                 reader.readAsDataURL(cachedData.blob);
@@ -597,23 +601,113 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ success: false, error: err.toString() });
             }
         })();
-        // 5. Open Options Page
-        if (message.type === 'OPEN_OPTIONS_PAGE') {
-            chrome.runtime.openOptionsPage();
-            sendResponse({ success: true });
-            return true;
-        }
-
-        return true; // Keep channel open for async responses
+        return true;
     }
 
-    // 5. Relay Events (Offscreen -> Content)
+    // 5. Open Options Page
+    if (message.type === 'OPEN_OPTIONS_PAGE') {
+        chrome.runtime.openOptionsPage();
+        sendResponse({ success: true });
+        return true;
+    }
+
+    // 6. Relay Events (Offscreen -> Content)
     if (['AUDIO_TIMEUPDATE', 'AUDIO_ENDED', 'AUDIO_ERROR'].includes(message.type)) {
         if (activeAudioTabId) {
             chrome.tabs.sendMessage(activeAudioTabId, message).catch(() => {
-                // Tab likely closed
                 activeAudioTabId = null;
             });
         }
+    }
+
+    // 7. Transcribe Audio (Google STT V2)
+    if (message.type === 'TRANSCRIBE_AUDIO') {
+        const { audioBase64, languageCode } = message.payload;
+        console.log('[Background] TRANSCRIBE_AUDIO request. AudioLength:', audioBase64?.length);
+
+        // Run async
+        (async () => {
+            try {
+                // Securely retrieve credentials
+                console.log('[Background] TRANSCRIBE_AUDIO: [1] Getting credentials...');
+                const { googleServiceAccountJson } = await chrome.storage.local.get(['googleServiceAccountJson']);
+                console.log('[Background] TRANSCRIBE_AUDIO: [2] Credentials retrieved.');
+
+                if (!googleServiceAccountJson || !validateServiceAccountJson(googleServiceAccountJson)) {
+                    throw new Error('Google Service Account JSON required for STT.');
+                }
+
+                console.log('[Background] TRANSCRIBE_AUDIO: [3] Getting Access Token...');
+                const accessToken = await getAccessToken(googleServiceAccountJson);
+                const projectId = googleServiceAccountJson.project_id;
+                console.log('[Background] TRANSCRIBE_AUDIO: [4] AccessToken obtained. Project:', projectId);
+
+                // V2 API Endpoint
+                const url = `https://speech.googleapis.com/v2/projects/${projectId}/locations/global/recognizers/_:recognize`;
+
+                const requestBody = {
+                    config: {
+                        autoDecodingConfig: {},
+                        features: {
+                            enableWordTimeOffsets: true
+                        },
+                        model: "long",
+                        languageCodes: [languageCode]
+                    },
+                    content: audioBase64
+                };
+
+                console.log('[Background] TRANSCRIBE_AUDIO: [5] Fetching Google API...');
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                console.log('[Background] TRANSCRIBE_AUDIO: [6] Fetch returned. Status:', resp.status);
+
+                if (!resp.ok) {
+                    const errorText = await resp.text();
+                    console.error('[Background] TRANSCRIBE_AUDIO: API Error', resp.status, errorText);
+                    throw new Error(`Google STT API Error: ${resp.status} ${errorText}`);
+                }
+
+                const data = await resp.json();
+                console.log('[Background] TRANSCRIBE_AUDIO: [7] Success. Results:', data.results?.length);
+
+                const timestamps: any[] = [];
+                if (data.results) {
+                    for (const result of data.results) {
+                        if (result.alternatives && result.alternatives[0].words) {
+                            for (const wordInfo of result.alternatives[0].words) {
+                                timestamps.push({
+                                    word: wordInfo.word,
+                                    startTime: parseFloat((wordInfo.startOffset || "0s").replace('s', '')),
+                                    endTime: parseFloat((wordInfo.endOffset || "0s").replace('s', ''))
+                                });
+                            }
+                        }
+                    }
+                }
+
+                console.log('[Background] TRANSCRIBE_AUDIO: [8] Sending Response with', timestamps.length, 'timestamps');
+                try {
+                    sendResponse({ success: true, timestamps });
+                } catch (e) {
+                    console.warn('[Background] Failed to send STT response (client likely gone):', e);
+                }
+
+            } catch (err: any) {
+                console.error('Background STT Error:', err);
+                try {
+                    sendResponse({ success: false, error: err.toString() });
+                } catch (e) {
+                    console.warn('[Background] Failed to send error response:', e);
+                }
+            }
+        })();
+        return true;
     }
 });

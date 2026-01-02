@@ -3,6 +3,7 @@ import { ReadingProvider } from './ReadingProvider';
 import { AlignmentMap, Word } from '../types';
 import { ChunkManager, AudioChunk } from '../audio/ChunkManager';
 import { GoogleClient, GoogleVoice } from '../services/GoogleClient';
+import { GoogleSTTClient } from '../services/GoogleSTTClient';
 
 export class GoogleProvider implements ReadingProvider {
     private alignmentMap: AlignmentMap;
@@ -168,6 +169,102 @@ export class GoogleProvider implements ReadingProvider {
         return ssml;
     }
 
+    private buildSSMLCorrected(chunk: AudioChunk): string {
+        // Correct SSML: mark BEFORE word
+        let ssml = '<speak>';
+        let wordCounter = 0;
+
+        chunk.sentences.forEach(sentence => {
+            sentence.words.forEach(word => {
+                const escaped = word.text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+
+                ssml += `<mark name="word_${wordCounter}"/>${escaped} `;
+                wordCounter++;
+            });
+            ssml += '<break time="300ms"/> ';
+        });
+
+        ssml += '</speak>';
+        return ssml;
+    }
+
+    // Overwrite buildSSML with corrected version
+    buildSSML_Final(chunk: AudioChunk): string {
+        return this.buildSSMLCorrected(chunk);
+    }
+
+    private async prepareChunkAudio(chunk: AudioChunk): Promise<void> {
+        if (chunk.status === 'ready' && (chunk.audioId || chunk.audioUrl) && chunk.alignment && chunk.alignment.length > 0) {
+            return;
+        }
+
+        let audioId = chunk.audioId;
+        let finalTimepoints: any[] = chunk.alignment || [];
+
+        // 1. Generate Audio if missing (or if we have no ID at all)
+        if (!audioId) {
+            const ssml = this.buildSSML_Final(chunk);
+            try {
+                const result = await GoogleClient.generateAudio(
+                    ssml,
+                    this.voiceId,
+                    this.languageCode,
+                    this.ssmlGender
+                );
+                audioId = result.audioId;
+                finalTimepoints = result.timepoints || [];
+            } catch (err) {
+                console.error('[GoogleProvider] Generation failed', err);
+                throw err;
+            }
+        }
+
+        // 2. STT Fallback if alignment is empty (e.g. Chirp 3)
+        if ((!finalTimepoints || finalTimepoints.length === 0)) {
+            console.log('[GoogleProvider] No timepoints. Starting STT fallback...');
+            try {
+                // Fetch the cached audio we just generated or retrieved
+                const fetchResp: any = await new Promise((resolve, reject) => {
+                    chrome.runtime.sendMessage({ type: 'FETCH_AUDIO', audioId }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            console.error('[GoogleProvider] FETCH_AUDIO runtime error:', chrome.runtime.lastError);
+                            reject(new Error(chrome.runtime.lastError.message || "FETCH_AUDIO channel error"));
+                        } else {
+                            resolve(response);
+                        }
+                    });
+                });
+
+                if (fetchResp && fetchResp.success && fetchResp.audioData) {
+                    console.log('[GoogleProvider] Audio fetched. Transcribing...');
+                    const sttTimestamps = await GoogleSTTClient.transcribeForTimestamps(fetchResp.audioData, this.languageCode);
+
+                    if (sttTimestamps.length > 0) {
+                        console.log(`[GoogleProvider] STT Success: ${sttTimestamps.length} timestamps.`);
+                        finalTimepoints = sttTimestamps.map((wt, idx) => ({
+                            markName: `word_${idx}`,
+                            timeSeconds: wt.startTime
+                        }));
+                    } else {
+                        console.warn('[GoogleProvider] STT returned 0 timestamps.');
+                    }
+                } else {
+                    console.error('[GoogleProvider] FETCH_AUDIO failed:', fetchResp);
+                }
+            } catch (sttErr) {
+                console.error('[GoogleProvider] STT Round-Trip Error:', sttErr);
+            }
+        }
+
+        chunk.audioId = audioId;
+        chunk.alignment = finalTimepoints;
+        chunk.status = 'ready';
+    }
+
     private async playChunk(index: number, startWordIndex: number = 0) {
         if (index < 0 || index >= this.chunks.length) return;
 
@@ -177,21 +274,7 @@ export class GoogleProvider implements ReadingProvider {
         if (this.onStateChange) this.onStateChange(true, true); // Loading
 
         try {
-            if (chunk.status !== 'ready' || (!chunk.audioId && !chunk.audioUrl)) {
-                // Generate SSML
-                const ssml = this.buildSSML_Final(chunk);
-
-                const { audioId, timepoints } = await GoogleClient.generateAudio(
-                    ssml,
-                    this.voiceId,
-                    this.languageCode,
-                    this.ssmlGender
-                );
-
-                chunk.audioId = audioId;
-                chunk.alignment = timepoints; // Store timepoints as alignment
-                chunk.status = 'ready';
-            }
+            await this.prepareChunkAudio(chunk);
 
             if (this.onStateChange) this.onStateChange(true, false); // Playing
 
@@ -255,35 +338,6 @@ export class GoogleProvider implements ReadingProvider {
             if (this.onStateChange) this.onStateChange(false, false);
         }
     }
-
-    private buildSSMLCorrected(chunk: AudioChunk): string {
-        // Correct SSML: mark BEFORE word
-        let ssml = '<speak>';
-        let wordCounter = 0;
-
-        chunk.sentences.forEach(sentence => {
-            sentence.words.forEach(word => {
-                const escaped = word.text
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;');
-
-                ssml += `<mark name="word_${wordCounter}"/>${escaped} `;
-                wordCounter++;
-            });
-            ssml += '<break time="300ms"/> ';
-        });
-
-        ssml += '</speak>';
-        return ssml;
-    }
-
-    // Overwrite buildSSML with corrected version
-    buildSSML_Final(chunk: AudioChunk): string {
-        return this.buildSSMLCorrected(chunk);
-    }
-
 
     private async playLocalAudio(audioId: string, startTime: number) {
         // Reusing similar logic to ElevenLabsProvider
@@ -352,16 +406,7 @@ export class GoogleProvider implements ReadingProvider {
         try {
             chunk.status = 'loading'; // speculative
             console.log(`Prefetching google chunk ${index}`);
-            const ssml = this.buildSSML_Final(chunk);
-            const { audioId, timepoints } = await GoogleClient.generateAudio(
-                ssml,
-                this.voiceId,
-                this.languageCode,
-                this.ssmlGender
-            );
-            chunk.audioId = audioId;
-            chunk.alignment = timepoints;
-            chunk.status = 'ready';
+            await this.prepareChunkAudio(chunk);
         } catch (e) {
             chunk.status = 'pending';
             console.warn(`Prefetch failed for google chunk ${index}`, e);

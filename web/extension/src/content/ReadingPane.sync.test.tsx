@@ -31,7 +31,21 @@ jest.mock('./alignment/Aligner', () => ({
 
 jest.mock('./services/ElevenLabsClient', () => ({
     ElevenLabsClient: {
-        getVoices: jest.fn(),
+        getVoices: jest.fn(() => Promise.resolve([])),
+        generateAudio: jest.fn()
+    }
+}));
+
+jest.mock('./services/GoogleClient', () => ({
+    GoogleClient: {
+        getVoices: jest.fn(() => Promise.resolve([])),
+        generateAudio: jest.fn()
+    }
+}));
+
+jest.mock('./services/ResembleClient', () => ({
+    ResembleClient: {
+        getVoices: jest.fn(() => Promise.resolve([])),
         generateAudio: jest.fn()
     }
 }));
@@ -145,10 +159,22 @@ const mockAlignmentMap: AlignmentMap = {
         }
     ]
 };
-
 describe('ReadingPane Synchronization', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+
+        // Force mock return values to be safe
+        const { GoogleClient } = require('./services/GoogleClient');
+        if (GoogleClient.getVoices.mockReturnValue) {
+            GoogleClient.getVoices.mockReturnValue(Promise.resolve([]));
+        }
+
+        const { ResembleClient } = require('./services/ResembleClient');
+        if (ResembleClient.getVoices.mockReturnValue) {
+            ResembleClient.getVoices.mockReturnValue(Promise.resolve([]));
+        }
+
         mockAudioInstances.length = 0;
         // Reset chrome mock
         const mockChrome = {

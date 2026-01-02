@@ -106,6 +106,120 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    // 1.6 Fetch Resemble Voices
+    if (message.type === 'FETCH_RESEMBLE_VOICES') {
+        const { apiKey } = message;
+        const tracer = trace.getTracer('readalong-extension');
+        tracer.startActiveSpan('Background.fetchResembleVoices', (span) => {
+            // First fetch projects to get a valid project_uuid if needed, 
+            // but primarily we need voices. Confusingly, Resemble has "Voices" and "Projects".
+            // We'll fetch Projects first, then Voices.
+            // Actually, let's just fetch Projects and assume we use the first project for context if needed,
+            // or maybe we just list Voices. 
+            // Let's try fetching Voices directly.
+            fetch('https://app.resemble.ai/api/v2/voices?page=1', {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        throw new Error(`Resemble API Error: ${res.status} ${errorText}`);
+                    }
+                    return res.json();
+                })
+                .then(async data => {
+                    // data.items should contain voices
+                    // We also need a project UUID to generate audio. 
+                    // Let's fetch projects and just attach the first one's UUID to all voices for now
+                    // or check if voices have project_uuid.
+
+                    const voices = data.items || [];
+
+                    // Fetch projects to find "ReadAlong" or create it
+                    let defaultProjectUuid = '';
+                    try {
+                        const projRes = await fetch('https://app.resemble.ai/api/v2/projects?page=1', {
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        // Helper to find project
+                        const findReadAlongProject = (items: any[]) => items.find((p: any) => p.name === 'ReadAlong');
+
+                        if (projRes.ok) {
+                            const projData = await projRes.json();
+                            const projects = projData.items || [];
+
+                            // 1. Try to find "ReadAlong"
+                            let targetProject = findReadAlongProject(projects);
+
+                            // 2. If not found, create it
+                            if (!targetProject) {
+                                console.log('[Background] "ReadAlong" project not found in Resemble. Creating...');
+                                const createRes = await fetch('https://app.resemble.ai/api/v2/projects', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${apiKey}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        name: 'ReadAlong',
+                                        description: 'Automatically created by ReadAlong extension for audio generation',
+                                        is_public: false,
+                                        is_collaborative: false,
+                                        is_archived: false
+                                    })
+                                });
+
+                                if (createRes.ok) {
+                                    const createData = await createRes.json();
+                                    // Resemble create response structure: { success: true, item: { ... } } or just item?
+                                    // Typically returns the created item.
+                                    targetProject = createData.item || createData;
+                                    console.log('[Background] Created "ReadAlong" project:', targetProject?.uuid);
+                                } else {
+                                    console.warn('[Background] Failed to create "ReadAlong" project', await createRes.text());
+                                }
+                            }
+
+                            // 3. Set UUID
+                            if (targetProject && targetProject.uuid) {
+                                defaultProjectUuid = targetProject.uuid;
+                            } else if (projects.length > 0) {
+                                // Fallback to first project if creation failed
+                                defaultProjectUuid = projects[0].uuid;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Failed to manage projects", e);
+                    }
+
+                    // Map voices
+                    const mappedVoices = voices.map((v: any) => ({
+                        uuid: v.uuid,
+                        name: v.name,
+                        project_uuid: defaultProjectUuid, // Auto-assigned project UUID
+                        preview_url: v.preview_url
+                    }));
+
+                    sendResponse({ success: true, voices: mappedVoices });
+                    span.end();
+                })
+                .catch(err => {
+                    span.recordException(err);
+                    span.setStatus({ code: SpanStatusCode.ERROR, message: err.toString() });
+                    sendResponse({ success: false, error: err.toString() });
+                    span.end();
+                });
+        });
+        return true;
+    }
+
     // 2. Generate Audio
     if (message.type === 'GENERATE_AUDIO') {
         const { voiceId, text, apiKey } = message as GenerateRequest;
@@ -162,7 +276,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 if (!resp.ok) {
                     const errorText = await resp.text();
-                    throw new Error(`API Error: ${resp.status} ${errorText}`);
+                    let errMsg = `API Error: ${resp.status} ${errorText}`;
+
+                    if (resp.status === 401) {
+                        errMsg = "ERR_UNAUTHORIZED: Invalid ElevenLabs API Key.";
+                    } else if (resp.status === 402) {
+                        errMsg = "ERR_PAYMENT_REQUIRED: ElevenLabs quota exceeded or payment required.";
+                    } else if (resp.status === 429) {
+                        errMsg = "ERR_TOO_MANY_REQUESTS: ElevenLabs rate limit exceeded. Please wait.";
+                    }
+
+                    throw new Error(errMsg);
                 }
 
                 const data = await resp.json();
@@ -266,6 +390,110 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             } catch (err: any) {
                 console.error('Background Google Error:', err);
+                span.recordException(err);
+                span.setStatus({ code: SpanStatusCode.ERROR, message: err.toString() });
+                sendResponse({ success: false, error: err.toString() });
+                span.end();
+            }
+        });
+        return true;
+    }
+
+    // 2.6 Generate Resemble Audio
+    if (message.type === 'GENERATE_RESEMBLE_AUDIO') {
+        const { text, voiceUuid, projectUuid, apiKey } = message;
+        const tracer = trace.getTracer('readalong-extension');
+
+        tracer.startActiveSpan('Background.generateResembleAudio', async (span) => {
+            span.setAttribute('resemble.voice_uuid', voiceUuid);
+
+            try {
+                // Generate ID based on text + voice
+                const id = await generateId(voiceUuid, text);
+
+                // Check Cache
+                const cachedData = await audioCache.getAudio(id);
+                if (cachedData) {
+                    console.log('Background: Resemble Cache hit for', id);
+                    span.addEvent('cache_hit');
+                    sendResponse({ success: true, audioId: id, alignment: cachedData.alignment });
+                    span.end();
+                    return;
+                }
+
+                span.addEvent('cache_miss');
+
+                // Generate Clip
+                console.log('Background: Generating Resemble Clip...');
+                if (!projectUuid) throw new Error("Project UUID required for Resemble Audio");
+
+                const resp = await fetch(`https://app.resemble.ai/api/v2/projects/${projectUuid}/clips`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: 'ReadAlong-Clip',
+                        body: text,
+                        voice_uuid: voiceUuid,
+                        is_public: false,
+                        is_archived: false,
+                        include_timestamps: true
+                    })
+                });
+
+                if (!resp.ok) {
+                    const errorText = await resp.text();
+                    let errMsg = `Resemble API Error: ${resp.status} ${errorText}`;
+
+                    if (resp.status === 401) {
+                        errMsg = "ERR_UNAUTHORIZED: Invalid Resemble API Key.";
+                    } else if (resp.status === 402) {
+                        errMsg = "ERR_PAYMENT_REQUIRED: Resemble AI quota exceeded or payment required.";
+                    } else if (resp.status === 429) {
+                        errMsg = "ERR_TOO_MANY_REQUESTS: Resemble AI rate limit exceeded.";
+                    }
+
+                    throw new Error(errMsg);
+                }
+
+                const data = await resp.json();
+                const item = data.item;
+                if (!item || !item.audio_src) throw new Error('No audio_src in response');
+
+                // Download Audio
+                const audioSrc = item.audio_src;
+                const audioResp = await fetch(audioSrc);
+                if (!audioResp.ok) throw new Error("Failed to download generated audio from Resemble");
+                const audioBlob = await audioResp.blob();
+
+                // Get Timestamps
+                const timestamps = item.timestamps;
+
+                // Cache it
+                await audioCache.saveAudio(id, audioBlob, timestamps);
+
+                sendResponse({ success: true, audioId: id, alignment: timestamps });
+                span.end();
+
+                // Cleanup: Delete the clip from Resemble to avoid clutter
+                // Since we have it cached locally, we don't need it on the server.
+                if (projectUuid && item.uuid) {
+                    fetch(`https://app.resemble.ai/api/v2/projects/${projectUuid}/clips/${item.uuid}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }).then(delRes => {
+                        if (delRes.ok) console.log('[Background] Cleaned up Resemble clip:', item.uuid);
+                        else console.warn('[Background] Failed to cleanup Resemble clip:', item.uuid);
+                    }).catch(e => console.warn('[Background] Error cleaning up Resemble clip:', e));
+                }
+
+            } catch (err: any) {
+                console.error('Background Resemble Error:', err);
                 span.recordException(err);
                 span.setStatus({ code: SpanStatusCode.ERROR, message: err.toString() });
                 sendResponse({ success: false, error: err.toString() });

@@ -13,6 +13,8 @@ import { ElevenLabsProvider } from './providers/ElevenLabsProvider';
 import { RecordedProvider } from './providers/RecordedProvider';
 import { GoogleClient, GoogleVoice } from './services/GoogleClient';
 import { GoogleProvider } from './providers/GoogleProvider';
+import { ResembleClient, ResembleVoice } from './services/ResembleClient';
+import { ResembleProvider } from './providers/ResembleProvider';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -38,7 +40,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Voice Preferences
-  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs' | 'google' | 'record'>('system');
+  const [voiceSource, setVoiceSource] = useState<'system' | 'elevenlabs' | 'google' | 'resemble' | 'record'>('system');
   const [systemVoiceURI, setSystemVoiceURI] = useState<string>('');
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
 
@@ -55,6 +57,13 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [selectedGoogleVoiceName, setSelectedGoogleVoiceName] = useState<string>('');
   const [isLoadingGoogleVoices, setIsLoadingGoogleVoices] = useState<boolean>(false);
   const [googleVoiceError, setGoogleVoiceError] = useState<string | null>(null);
+
+  // Resemble State
+  const [resembleApiKey, setResembleApiKey] = useState<string>('');
+  const [resembleVoices, setResembleVoices] = useState<ResembleVoice[]>([]);
+  const [selectedResembleVoiceUuid, setSelectedResembleVoiceUuid] = useState<string>('');
+  const [isLoadingResembleVoices, setIsLoadingResembleVoices] = useState<boolean>(false);
+  const [resembleVoiceError, setResembleVoiceError] = useState<string | null>(null);
 
   // Recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -119,7 +128,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName', 'playbackRate'], (result: any) => {
+      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName', 'playbackRate', 'resembleApiKey', 'selectedResembleVoiceUuid'], (result: any) => {
         if (result.theme) setTheme(result.theme);
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
@@ -129,6 +138,8 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         if (result.systemVoiceURI) setSystemVoiceURI(result.systemVoiceURI);
         if (result.googleApiKey) setGoogleApiKey(result.googleApiKey);
         if (result.selectedGoogleVoiceName) setSelectedGoogleVoiceName(result.selectedGoogleVoiceName);
+        if (result.resembleApiKey) setResembleApiKey(result.resembleApiKey);
+        if (result.selectedResembleVoiceUuid) setSelectedResembleVoiceUuid(result.selectedResembleVoiceUuid);
         if (result.playbackRate) setPlaybackRate(result.playbackRate);
         setSettingsLoaded(true);
       });
@@ -212,11 +223,29 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     }
   }, [googleApiKey, isSettingsOpen, voiceSource]);
 
+  // Fetch Resemble voices
+  useEffect(() => {
+    if (resembleApiKey && isSettingsOpen && voiceSource === 'resemble') {
+      const trimmedKey = resembleApiKey.trim();
+      if (!trimmedKey) return;
+
+      setIsLoadingResembleVoices(true);
+      setResembleVoiceError(null);
+      ResembleClient.getVoices(trimmedKey)
+        .then((voices: ResembleVoice[]) => setResembleVoices(voices))
+        .catch((err: any) => {
+          console.error("Failed to load resemble voices", err);
+          setResembleVoiceError(typeof err === 'string' ? err : (err.message || String(err)));
+        })
+        .finally(() => setIsLoadingResembleVoices(false));
+    }
+  }, [resembleApiKey, isSettingsOpen, voiceSource]);
+
   // Save settings when they change, and STOP playback to prevent ghost voices
   useEffect(() => {
     const chromeApi = getChrome();
     if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName, playbackRate });
+      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName, resembleApiKey, selectedResembleVoiceUuid, playbackRate });
     }
 
     // CRITICAL FIX: If voice settings change while playing, STOP immediately.
@@ -235,7 +264,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       // Or handle it separately.
       // Let's leave playbackRate OUT of this dependency array and handle it in its own effect.
     }
-  }, [theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName]);
+  }, [theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName, resembleApiKey, selectedResembleVoiceUuid]);
 
   // Separate effect for Playback Rate to allow dynamic updates
   useEffect(() => {
@@ -557,6 +586,20 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       } else {
         console.warn("Google selected but missing config.");
         alert("Please configure Google Cloud API Key and Voice in Settings.");
+        return null;
+      }
+    }
+    // 2.5 Resemble AI
+    else if (voiceSource === 'resemble') {
+      const selectedVoice = resembleVoices.find(v => v.uuid === selectedResembleVoiceUuid);
+      if (resembleApiKey && selectedVoice) {
+        // Default projectUuid if missing in voice object (should have been handled in client)
+        const projUuid = selectedVoice.project_uuid || '';
+        if (!projUuid) console.warn("Resemble voice missing project UUID, might fail.", selectedVoice);
+        provider = new ResembleProvider(activeAlignmentMap, resembleApiKey, selectedVoice.uuid, projUuid);
+      } else {
+        console.warn("Resemble selected but missing config.");
+        alert("Please configure Resemble API Key and Voice in Settings.");
         return null;
       }
     }
@@ -973,6 +1016,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                     <option value="system">System Voices</option>
                     <option value="elevenlabs">ElevenLabs</option>
                     <option value="google">Google Voices</option>
+                    <option value="resemble">Resemble.ai</option>
                     <option value="record">Record</option>
                   </select>
                 </div>
@@ -1080,6 +1124,46 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                                 .map((v: GoogleVoice) => (
                                   <option key={v.name} value={v.name}>{v.name} ({v.ssmlGender})</option>
                                 ))}
+                            </select>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                {voiceSource === 'resemble' && (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label htmlFor="resemble-api-key" style={{ fontSize: '12px', fontWeight: 'bold' }}>Resemble API Key</label>
+                      <input
+                        id="resemble-api-key"
+                        type={"pass" + "word"}
+                        value={resembleApiKey}
+                        onChange={(e) => setResembleApiKey(e.target.value)}
+                        placeholder="Key..."
+                      />
+                    </div>
+
+                    {resembleApiKey && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <label htmlFor="resemble-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>Resemble Voice</label>
+                        {isLoadingResembleVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
+                          <>
+                            {resembleVoiceError && (
+                              <div style={{ color: 'red', fontSize: '10px', marginBottom: '5px' }}>
+                                Error: {resembleVoiceError}
+                              </div>
+                            )}
+                            <select
+                              id="resemble-voice-select"
+                              value={selectedResembleVoiceUuid}
+                              onChange={(e) => setSelectedResembleVoiceUuid(e.target.value)}
+                              style={{ maxWidth: '200px' }}
+                            >
+                              <option value="">-- Select Voice --</option>
+                              {resembleVoices.map(v => (
+                                <option key={v.uuid} value={v.uuid}>{v.name}</option>
+                              ))}
                             </select>
                           </>
                         )}

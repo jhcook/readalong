@@ -7,7 +7,6 @@ import { GoogleClient, GoogleVoice } from '../services/GoogleClient';
 export class GoogleProvider implements ReadingProvider {
     private alignmentMap: AlignmentMap;
     private chunks: AudioChunk[] = [];
-    private apiKey: string;
     private voiceId: string; // e.g. "en-US-Neural2-F"
     private languageCode: string; // e.g. "en-US"
     private ssmlGender: string;   // e.g. "FEMALE"
@@ -16,6 +15,7 @@ export class GoogleProvider implements ReadingProvider {
     private currentChunkIndex: number = -1;
     private isPaused: boolean = false;
     private chunkGlobalWordOffsets: number[] = [];
+    private playbackRate: number = 1; // Default rate
 
     // Message Listener
     private messageListener: ((message: any, sender: any, sendResponse: any) => void) | null = null;
@@ -26,9 +26,8 @@ export class GoogleProvider implements ReadingProvider {
     onStateChange?: (isPlaying: boolean, isLoading: boolean) => void;
     onError?: (error: string) => void;
 
-    constructor(alignmentMap: AlignmentMap, apiKey: string, voice: GoogleVoice) {
+    constructor(alignmentMap: AlignmentMap, voice: GoogleVoice) {
         this.alignmentMap = alignmentMap;
-        this.apiKey = apiKey;
         this.voiceId = voice.name;
         this.languageCode = voice.languageCodes[0];
         this.ssmlGender = voice.ssmlGender;
@@ -71,7 +70,6 @@ export class GoogleProvider implements ReadingProvider {
         const timepoints = chunk.alignment as { markName: string, timeSeconds: number }[];
 
         // Find the latest timepoint that is <= currentTime
-        // We can optimize this if needed, but linear back-scan is fine for small chunks
         let activeMarkName: string | null = null;
 
         for (let i = timepoints.length - 1; i >= 0; i--) {
@@ -84,7 +82,6 @@ export class GoogleProvider implements ReadingProvider {
         if (activeMarkName && activeMarkName.startsWith('word_')) {
             const localWordIndex = parseInt(activeMarkName.split('_')[1], 10);
             if (!isNaN(localWordIndex)) {
-                // Map to global
                 const globalChunkOffset = this.chunkGlobalWordOffsets[this.currentChunkIndex];
                 const globalIndex = globalChunkOffset + localWordIndex;
                 if (this.onWordBoundary) {
@@ -182,10 +179,9 @@ export class GoogleProvider implements ReadingProvider {
         try {
             if (chunk.status !== 'ready' || (!chunk.audioId && !chunk.audioUrl)) {
                 // Generate SSML
-                const ssml = this.buildSSML(chunk);
+                const ssml = this.buildSSML_Final(chunk);
 
                 const { audioId, timepoints } = await GoogleClient.generateAudio(
-                    this.apiKey,
                     ssml,
                     this.voiceId,
                     this.languageCode,
@@ -214,18 +210,23 @@ export class GoogleProvider implements ReadingProvider {
                 const targetMark = `word_${startWordIndex}`;
                 const tp = timepoints.find(t => t.markName === targetMark);
                 if (tp) {
-                    startTime = tp.timeSeconds;
+                    startTime = parseFloat(String(tp.timeSeconds));
+                    console.debug(`[GoogleProvider] Found mark ${targetMark} at ${startTime}s. Full TP:`, tp);
+                } else {
+                    console.warn(`[GoogleProvider] Mark ${targetMark} not found in timepoints. Available marks:`, timepoints.length);
                 }
             }
 
             // Play via Offscreen
             if (!this.useFallback) {
+                console.debug(`[GoogleProvider] Playing via Offscreen. AudioId: ${chunk.audioId} StartTime: ${startTime}`);
                 try {
                     await new Promise<void>((resolve, reject) => {
                         chrome.runtime.sendMessage({
                             type: 'PLAY_AUDIO',
                             audioId: chunk.audioId,
-                            startTime: startTime
+                            startTime: startTime,
+                            rate: this.playbackRate
                         }, (response) => {
                             if (chrome.runtime.lastError || (response && !response.success)) {
                                 reject(new Error(chrome.runtime.lastError?.message || response?.error || "Playback failed"));
@@ -313,7 +314,27 @@ export class GoogleProvider implements ReadingProvider {
 
             if (response && response.success) {
                 this.localAudio.src = response.audioData;
-                this.localAudio.currentTime = startTime;
+
+                // Robust Seek
+                if (startTime > 0) {
+                    await new Promise<void>(resolve => {
+                        const onMetadata = () => {
+                            if (this.localAudio) this.localAudio.currentTime = startTime;
+                            resolve();
+                        };
+                        if (this.localAudio && this.localAudio.readyState >= 1) {
+                            onMetadata();
+                        } else if (this.localAudio) {
+                            this.localAudio.addEventListener('loadedmetadata', onMetadata, { once: true });
+                        } else {
+                            resolve();
+                        }
+                    });
+                } else {
+                    this.localAudio.currentTime = 0;
+                }
+
+                this.localAudio.playbackRate = this.playbackRate;
                 await this.localAudio.play();
             } else {
                 throw new Error(response.error || "Failed to fetch local audio");
@@ -333,7 +354,6 @@ export class GoogleProvider implements ReadingProvider {
             console.log(`Prefetching google chunk ${index}`);
             const ssml = this.buildSSML_Final(chunk);
             const { audioId, timepoints } = await GoogleClient.generateAudio(
-                this.apiKey,
                 ssml,
                 this.voiceId,
                 this.languageCode,
@@ -375,13 +395,22 @@ export class GoogleProvider implements ReadingProvider {
             this.localAudio.removeAttribute('src');
             this.localAudio.load();
         }
-        chrome.runtime.sendMessage({ type: 'STOP_AUDIO' });
+
+        try {
+            chrome.runtime.sendMessage({ type: 'STOP_AUDIO' });
+        } catch (e) {
+            // Extension context invalidated - ignore
+        }
 
         this.currentChunkIndex = -1;
         this.isPaused = false;
 
         if (this.messageListener) {
-            chrome.runtime.onMessage.removeListener(this.messageListener);
+            try {
+                chrome.runtime.onMessage.removeListener(this.messageListener);
+            } catch (e) {
+                // Extension context invalidated - ignore
+            }
             this.messageListener = null;
         }
 
@@ -389,9 +418,14 @@ export class GoogleProvider implements ReadingProvider {
     }
 
     setPlaybackRate(rate: number): void {
+        this.playbackRate = rate;
         if (this.localAudio) {
             this.localAudio.playbackRate = rate;
         }
-        chrome.runtime.sendMessage({ type: 'SET_PLAYBACK_RATE', rate });
+        try {
+            chrome.runtime.sendMessage({ type: 'SET_PLAYBACK_RATE', rate: rate });
+        } catch (e) {
+            // Extension context invalidated - ignore
+        }
     }
 }

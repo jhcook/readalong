@@ -8,7 +8,7 @@ export interface AudioChunk {
     endWordIndex: number;
     audioUrl?: string; // Blob URL (Legacy/System)
     audioId?: string;  // ElevenLabs Audio ID (Offscreen)
-    alignment?: any;   // ElevenLabs alignment
+    alignment?: any;   // ElevenLabs alignment / Google timepoints
     status: 'pending' | 'loading' | 'ready' | 'error';
     error?: string;
 }

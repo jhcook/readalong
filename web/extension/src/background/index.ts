@@ -1,6 +1,8 @@
 import { AudioCache } from './AudioCache';
 import { setupTracing } from './tracing';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
+import { getAccessToken, validateServiceAccountJson } from './GoogleAuth';
+import { ServiceAccountJson } from '../types/google-auth';
 
 setupTracing();
 const audioCache = new AudioCache();
@@ -79,29 +81,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // 1.5 Fetch Google Voices
+    // 1.5 Fetch Google Voices (supports API Key or Service Account JSON)
     if (message.type === 'FETCH_GOOGLE_VOICES') {
-        const { apiKey } = message;
         const tracer = trace.getTracer('readalong-extension');
-        tracer.startActiveSpan('Background.fetchGoogleVoices', (span) => {
-            fetch(`https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`)
-                .then(async res => {
-                    if (!res.ok) {
-                        const errorText = await res.text();
-                        throw new Error(`Google API Error: ${res.status} ${errorText}`);
-                    }
-                    return res.json();
-                })
-                .then(data => {
-                    sendResponse({ success: true, voices: data.voices });
-                    span.end();
-                })
-                .catch(err => {
-                    span.recordException(err);
-                    span.setStatus({ code: SpanStatusCode.ERROR, message: err.toString() });
-                    sendResponse({ success: false, error: err.toString() });
-                    span.end();
-                });
+        tracer.startActiveSpan('Background.fetchGoogleVoices', async (span) => {
+            try {
+                // Securely retrieve credentials from storage
+                const { googleApiKey, googleServiceAccountJson } = await chrome.storage.local.get(['googleApiKey', 'googleServiceAccountJson']);
+
+                let headers: HeadersInit = {};
+                let url = 'https://texttospeech.googleapis.com/v1beta1/voices';
+
+                if (googleServiceAccountJson && validateServiceAccountJson(googleServiceAccountJson)) {
+                    // OAuth2 path - use Service Account
+                    span.addEvent('auth_mode_service_account');
+                    const accessToken = await getAccessToken(googleServiceAccountJson);
+                    headers = { 'Authorization': `Bearer ${accessToken}` };
+                } else if (googleApiKey) {
+                    // Legacy API Key path
+                    span.addEvent('auth_mode_api_key');
+                    url = `${url}?key=${googleApiKey}`;
+                } else {
+                    throw new Error('No authentication provided (API Key or Service Account JSON)');
+                }
+
+                const res = await fetch(url, { headers });
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Google API Error: ${res.status} ${errorText}`);
+                }
+
+                const data = await res.json();
+                sendResponse({ success: true, voices: data.voices });
+                span.end();
+            } catch (err: any) {
+                span.recordException(err);
+                span.setStatus({ code: SpanStatusCode.ERROR, message: err.toString() });
+                sendResponse({ success: false, error: err.toString() });
+                span.end();
+            }
         });
         return true;
     }
@@ -322,9 +340,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // 2.5 Generate Google Audio
+    // 2.5 Generate Google Audio (supports API Key or Service Account JSON)
     if (message.type === 'GENERATE_GOOGLE_AUDIO') {
-        const { text, voiceId, apiKey, languageCode, ssmlGender } = message;
+        const { text, voiceId, languageCode, ssmlGender } = message;
 
         const tracer = trace.getTracer('readalong-extension');
         tracer.startActiveSpan('Background.generateGoogleAudio', async (span) => {
@@ -346,19 +364,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 span.addEvent('cache_miss');
 
+                // Securely retrieve credentials from storage
+                const { googleApiKey, googleServiceAccountJson } = await chrome.storage.local.get(['googleApiKey', 'googleServiceAccountJson']);
+
+                // Determine authentication method
+                let headers: HeadersInit = { 'Content-Type': 'application/json' };
+                let url = 'https://texttospeech.googleapis.com/v1beta1/text:synthesize';
+
+                if (googleServiceAccountJson && validateServiceAccountJson(googleServiceAccountJson)) {
+                    // OAuth2 path - use Service Account
+                    span.addEvent('auth_mode_service_account');
+                    const accessToken = await getAccessToken(googleServiceAccountJson);
+                    headers['Authorization'] = `Bearer ${accessToken}`;
+                } else if (googleApiKey) {
+                    // Legacy API Key path
+                    span.addEvent('auth_mode_api_key');
+                    url = `${url}?key=${googleApiKey}`;
+                } else {
+                    throw new Error('No authentication provided (API Key or Service Account JSON)');
+                }
+
                 // Fetch from Google API
-                console.log('Background: Fetching from Google Cloud TTS...');
-                const resp = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
+                const requestBody = {
+                    input: { ssml: text },
+                    voice: { languageCode: languageCode, name: voiceId, ssmlGender: ssmlGender },
+                    audioConfig: {
+                        audioEncoding: "MP3"
+                    },
+                    enableTimePointing: ["SSML_MARK"]
+                };
+                console.log('Background: Google TTS Request:', JSON.stringify(requestBody, null, 2));
+                const resp = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        input: { ssml: text },
-                        voice: { languageCode: languageCode, name: voiceId, ssmlGender: ssmlGender },
-                        audioConfig: {
-                            audioEncoding: "MP3",
-                            enableTimePointing: ["SSML_MARK"]
-                        }
-                    })
+                    headers,
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!resp.ok) {
@@ -369,6 +408,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await resp.json();
                 const audioBase64 = data.audioContent;
                 const timepoints = data.timepoints || [];
+
 
                 if (!audioBase64) throw new Error('No audio content received from Google');
 
@@ -557,7 +597,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ success: false, error: err.toString() });
             }
         })();
-        return true;
+        // 5. Open Options Page
+        if (message.type === 'OPEN_OPTIONS_PAGE') {
+            chrome.runtime.openOptionsPage();
+            sendResponse({ success: true });
+            return true;
+        }
+
+        return true; // Keep channel open for async responses
     }
 
     // 5. Relay Events (Offscreen -> Content)

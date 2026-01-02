@@ -65,7 +65,25 @@ async function playAudio(audioId: string, startTime: number = 0, rate: number = 
         }
 
         audio.playbackRate = rate;
-        audio.currentTime = startTime; // If seeking
+
+        // Robust Seek: Wait for metadata if needed
+        if (startTime > 0) {
+            if (audio.readyState >= 1) { // HAVE_METADATA
+                audio.currentTime = startTime;
+            } else {
+                await new Promise<void>(resolve => {
+                    const onMetadata = () => {
+                        audio.currentTime = startTime;
+                        audio.removeEventListener('loadedmetadata', onMetadata);
+                        resolve();
+                    };
+                    audio.addEventListener('loadedmetadata', onMetadata);
+                });
+            }
+        } else {
+            audio.currentTime = 0;
+        }
+
         await audio.play();
 
     } catch (err: any) {

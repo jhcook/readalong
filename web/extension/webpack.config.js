@@ -8,6 +8,7 @@ module.exports = {
     background: './src/background/index.ts',
     offscreen: './src/offscreen/offscreen.ts',
     sandbox: './src/sandbox/sandbox.ts',
+    options: './src/options/index.tsx',
   },
   module: {
     rules: [

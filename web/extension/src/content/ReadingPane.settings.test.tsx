@@ -217,7 +217,7 @@ describe('ReadingPane Settings & Fallback', () => {
         });
 
         // Should Trigger Alert
-        expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Please configure Google Cloud API Key'));
+        expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Please configure Google Cloud authentication'));
 
         // Should NOT trigger System TTS (speak)
         expect((window.speechSynthesis.speak as jest.Mock)).not.toHaveBeenCalled();

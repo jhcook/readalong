@@ -15,6 +15,7 @@ import { GoogleClient, GoogleVoice } from './services/GoogleClient';
 import { GoogleProvider } from './providers/GoogleProvider';
 import { ResembleClient, ResembleVoice } from './services/ResembleClient';
 import { ResembleProvider } from './providers/ResembleProvider';
+import { GoogleAuthOptions } from '../types/google-auth';
 
 interface ReadingPaneProps {
   alignmentMap?: AlignmentMap;
@@ -52,7 +53,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [voiceFetchError, setVoiceFetchError] = useState<string | null>(null);
 
   // Google State
-  const [googleApiKey, setGoogleApiKey] = useState<string>('');
+  const [googleAuthMode, setGoogleAuthMode] = useState<'apiKey' | 'serviceAccount'>('apiKey');
   const [googleVoices, setGoogleVoices] = useState<GoogleVoice[]>([]);
   const [selectedGoogleVoiceName, setSelectedGoogleVoiceName] = useState<string>('');
   const [isLoadingGoogleVoices, setIsLoadingGoogleVoices] = useState<boolean>(false);
@@ -128,7 +129,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'selectedGoogleVoiceName', 'playbackRate', 'resembleApiKey', 'selectedResembleVoiceUuid'], (result: any) => {
+      chromeApi.storage.local.get(['theme', 'isDyslexiaFont', 'isHighContrast', 'elevenLabsApiKey', 'selectedVoiceId', 'voiceSource', 'systemVoiceURI', 'googleApiKey', 'googleServiceAccountJson', 'googleAuthMode', 'selectedGoogleVoiceName', 'playbackRate', 'resembleApiKey', 'selectedResembleVoiceUuid'], (result: any) => {
         if (result.theme) setTheme(result.theme);
         if (result.isDyslexiaFont !== undefined) setIsDyslexiaFont(result.isDyslexiaFont);
         if (result.isHighContrast !== undefined) setIsHighContrast(result.isHighContrast);
@@ -136,7 +137,8 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         if (result.selectedVoiceId) setSelectedVoiceId(result.selectedVoiceId);
         if (result.voiceSource) setVoiceSource(result.voiceSource);
         if (result.systemVoiceURI) setSystemVoiceURI(result.systemVoiceURI);
-        if (result.googleApiKey) setGoogleApiKey(result.googleApiKey);
+        // We still read authMode to know if user thinks they are configured
+        if (result.googleAuthMode) setGoogleAuthMode(result.googleAuthMode);
         if (result.selectedGoogleVoiceName) setSelectedGoogleVoiceName(result.selectedGoogleVoiceName);
         if (result.resembleApiKey) setResembleApiKey(result.resembleApiKey);
         if (result.selectedResembleVoiceUuid) setSelectedResembleVoiceUuid(result.selectedResembleVoiceUuid);
@@ -205,15 +207,17 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
   }, [elevenLabsApiKey, isSettingsOpen, voiceSource]);
 
-  // Fetch Google voices
+  // Fetch Google voices (supports API Key or Service Account)
   useEffect(() => {
-    if (googleApiKey && isSettingsOpen && voiceSource === 'google') {
-      const trimmedKey = googleApiKey.trim();
-      if (!trimmedKey) return;
+    if (isSettingsOpen && voiceSource === 'google') {
+      // We no longer check valid keys here, we assume background will error if missing.
+      // Or we could check if storage has them? But reading storage async is messy here.
+      // Let's rely on GoogleClient returning error if auth fails in background.
 
       setIsLoadingGoogleVoices(true);
       setGoogleVoiceError(null);
-      GoogleClient.getVoices(trimmedKey)
+
+      GoogleClient.getVoices()
         .then((voices: GoogleVoice[]) => setGoogleVoices(voices))
         .catch((err: any) => {
           console.error("Failed to load google voices", err);
@@ -221,7 +225,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
         })
         .finally(() => setIsLoadingGoogleVoices(false));
     }
-  }, [googleApiKey, isSettingsOpen, voiceSource]);
+  }, [googleAuthMode, isSettingsOpen, voiceSource]);
 
   // Fetch Resemble voices
   useEffect(() => {
@@ -245,7 +249,10 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   useEffect(() => {
     const chromeApi = getChrome();
     if (settingsLoaded && chromeApi && chromeApi.storage && chromeApi.storage.local) {
-      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName, resembleApiKey, selectedResembleVoiceUuid, playbackRate });
+      // Do NOT save back the keys here to avoid overwriting them with empty strings if we didn't load them!
+      // In fact, since we removed state vars, we can't save them.
+      // We only save the UI preferences managed by this component.
+      chromeApi.storage.local.set({ theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleAuthMode, selectedGoogleVoiceName, resembleApiKey, selectedResembleVoiceUuid, playbackRate });
     }
 
     // CRITICAL FIX: If voice settings change while playing, STOP immediately.
@@ -264,7 +271,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       // Or handle it separately.
       // Let's leave playbackRate OUT of this dependency array and handle it in its own effect.
     }
-  }, [theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleApiKey, selectedGoogleVoiceName, resembleApiKey, selectedResembleVoiceUuid]);
+  }, [theme, isDyslexiaFont, isHighContrast, elevenLabsApiKey, selectedVoiceId, voiceSource, systemVoiceURI, googleAuthMode, selectedGoogleVoiceName, resembleApiKey, selectedResembleVoiceUuid]);
 
   // Separate effect for Playback Rate to allow dynamic updates
   useEffect(() => {
@@ -581,11 +588,12 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     // 2. Google Voices
     else if (voiceSource === 'google') {
       const selectedVoice = googleVoices.find(v => v.name === selectedGoogleVoiceName);
-      if (googleApiKey && selectedVoice) {
-        provider = new GoogleProvider(activeAlignmentMap, googleApiKey, selectedVoice);
+
+      if (selectedVoice) {
+        provider = new GoogleProvider(activeAlignmentMap, selectedVoice);
       } else {
         console.warn("Google selected but missing config.");
-        alert("Please configure Google Cloud API Key and Voice in Settings.");
+        alert("Please configure Google Cloud authentication and Voice in Settings.");
         return null;
       }
     }
@@ -1091,18 +1099,52 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
 
                 {voiceSource === 'google' && (
                   <>
+                    {/* Auth Mode Toggle */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      <label htmlFor="google-api-key" style={{ fontSize: '12px', fontWeight: 'bold' }}>Google Cloud API Key</label>
-                      <input
-                        id="google-api-key"
-                        type={"pass" + "word"}
-                        value={googleApiKey}
-                        onChange={(e) => setGoogleApiKey(e.target.value)}
-                        placeholder="AIza..."
-                      />
+                      <label htmlFor="google-auth-mode" style={{ fontSize: '12px', fontWeight: 'bold' }}>Authentication Method</label>
+                      <select
+                        id="google-auth-mode"
+                        value={googleAuthMode}
+                        onChange={(e) => setGoogleAuthMode(e.target.value as 'apiKey' | 'serviceAccount')}
+                        style={{ maxWidth: '200px' }}
+                      >
+                        <option value="apiKey">API Key</option>
+                        <option value="serviceAccount">Service Account JSON</option>
+                      </select>
                     </div>
 
-                    {googleApiKey && (
+                    {/* API Key / Service Account Configuration Prompt */}
+                    <div style={{ padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', fontSize: '11px' }}>
+                      <p style={{ margin: '0 0 5px 0' }}>
+                        To securely configure Google Cloud credentials, please use the extension options page.
+                      </p>
+                      <button
+                        className="readalong-control-btn"
+                        style={{ width: '100%' }}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          try {
+                            chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE' }, () => {
+                              if (chrome.runtime.lastError) {
+                                console.warn("Failed to open options:", chrome.runtime.lastError);
+                                alert("Please right-click the extension icon and select 'Options' to configure credentials.");
+                              }
+                            });
+                          } catch (err) {
+                            alert("Please right-click the extension icon and select 'Options' to configure credentials.");
+                          }
+                        }}
+                      >
+                        Open Options
+                      </button>
+                    </div>
+
+                    {/* Voice Selection (shown when we believe it is configured - relying on googleAuthMode for UI state) */}
+                    {/* We used to check googleApiKey/etc here. Now we just check mode and maybe rely on voice load success? */}
+                    {/* Or assume user has configured it if they selected the mode. */}
+                    {(googleAuthMode === 'apiKey' || googleAuthMode === 'serviceAccount') && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                         <label htmlFor="google-voice-select" style={{ fontSize: '12px', fontWeight: 'bold' }}>Google Voice</label>
                         {isLoadingGoogleVoices ? <span style={{ fontSize: '10px' }}>Loading...</span> : (
@@ -1120,7 +1162,7 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
                             >
                               <option value="">-- Select Voice --</option>
                               {googleVoices
-                                .filter((v: GoogleVoice) => v.languageCodes.some((l: string) => l.startsWith('en'))) // Filter for English for now
+                                .filter((v: GoogleVoice) => v.languageCodes.some((l: string) => l.startsWith('en')))
                                 .map((v: GoogleVoice) => (
                                   <option key={v.name} value={v.name}>{v.name} ({v.ssmlGender})</option>
                                 ))}

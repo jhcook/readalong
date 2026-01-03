@@ -90,6 +90,15 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
   const [ignoredSentenceIndices, setIgnoredSentenceIndices] = useState<Set<number>>(new Set());
   const [lastInteractionIndex, setLastInteractionIndex] = useState<number | null>(null);
 
+  // Ref to track previous ignored indices for dynamic ignore detection
+  const prevIgnoredRef = useRef<Set<number>>(new Set());
+
+  // Ref to store the provider's alignment map for direct play() calls during skips
+  const providerAlignmentMapRef = useRef<AlignmentMap | null>(null);
+
+  // Ref to store the filteredToGlobal mapping at provider init time (for correct word boundary conversion)
+  const providerFilteredToGlobalMapRef = useRef<number[] | null>(null);
+
   // Refs for scrolling to matches
   const matchRefs = useRef<(HTMLParagraphElement | null)[]>([]);
 
@@ -577,6 +586,108 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     };
   }, [allWords, isRecording]);
 
+  // Effect: Handle ignore of CURRENT sentence during playback
+  // When user ignores the sentence being read, skip to next immediately
+  useEffect(() => {
+    // Only act if we're actively playing
+    if (!isPlaying || isPaused || !alignmentMap) return;
+
+    // Compare sets to detect actual changes
+    const prevSet = prevIgnoredRef.current;
+    const currentSet = ignoredSentenceIndices;
+
+    // Check if they're different
+    if (prevSet.size === currentSet.size &&
+      [...prevSet].every(v => currentSet.has(v))) {
+      return; // No change
+    }
+
+    // Update ref for next comparison
+    prevIgnoredRef.current = new Set(currentSet);
+
+    // Find current sentence based on currentWordIndex
+    if (currentWordIndex < 0) return;
+
+    const currentWord = allWords[currentWordIndex];
+    if (!currentWord) return;
+
+    const currentSentenceIdx = alignmentMap.sentences.findIndex(
+      s => s.words.includes(currentWord)
+    );
+
+    if (currentSentenceIdx === -1) return;
+
+    // ONLY act if the CURRENT sentence was just ignored
+    if (currentSet.has(currentSentenceIdx) && !prevSet.has(currentSentenceIdx)) {
+      // The currently-playing sentence was just ignored - skip to next non-ignored
+      let nextValidIdx = -1;
+      for (let i = currentSentenceIdx + 1; i < alignmentMap.sentences.length; i++) {
+        if (!currentSet.has(i)) {
+          nextValidIdx = i;
+          break;
+        }
+      }
+
+      if (nextValidIdx !== -1) {
+        // Always reinitialize for correct highlighting sync
+        // AudioCache prevents refetching, so performance impact is minimal
+        handleReadAloud(nextValidIdx);
+      } else {
+        handleStop();
+      }
+    }
+    // For future sentences: we don't restart - we'll catch it when we enter that sentence
+
+    // Handle UNIGNORE: If any sentence was removed from ignored set, we need to reinitialize
+    // because the provider's alignment map doesn't include that sentence
+    const newlyUnignored = [...prevSet].filter(idx => !currentSet.has(idx));
+    if (newlyUnignored.length > 0) {
+      // A sentence was unignored - reinitialize to include it
+      handleReadAloud(currentSentenceIdx);
+    }
+  }, [ignoredSentenceIndices, isPlaying, isPaused, currentWordIndex, alignmentMap, allWords]);
+
+  // Track previous sentence index for detecting sentence transitions
+  const prevSentenceIdxRef = useRef<number>(-1);
+
+  // Effect: Detect when playback ENTERS an ignored sentence and skip past it
+  // This handles the case where a future sentence was ignored and we've now reached it
+  useEffect(() => {
+    if (!isPlaying || !alignmentMap || currentWordIndex < 0) return;
+
+    const currentWord = allWords[currentWordIndex];
+    if (!currentWord) return;
+
+    const currentSentenceIdx = alignmentMap.sentences.findIndex(
+      s => s.words.includes(currentWord)
+    );
+
+    if (currentSentenceIdx === -1) return;
+
+    // Check if we just transitioned to a new sentence
+    if (currentSentenceIdx !== prevSentenceIdxRef.current) {
+      prevSentenceIdxRef.current = currentSentenceIdx;
+
+      // If we just entered an ignored sentence, skip to next valid
+      if (ignoredSentenceIndices.has(currentSentenceIdx)) {
+        let nextValidIdx = -1;
+        for (let i = currentSentenceIdx + 1; i < alignmentMap.sentences.length; i++) {
+          if (!ignoredSentenceIndices.has(i)) {
+            nextValidIdx = i;
+            break;
+          }
+        }
+
+        if (nextValidIdx !== -1) {
+          // Always reinitialize for correct highlighting sync
+          handleReadAloud(nextValidIdx);
+        } else {
+          handleStop();
+        }
+      }
+    }
+  }, [currentWordIndex, isPlaying, alignmentMap, allWords, ignoredSentenceIndices]);
+
 
   // --- Playback Control --- //
 
@@ -652,26 +763,13 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
     if (provider) {
       // Hook up callbacks
       provider.onWordBoundary = (idx) => {
-        // Fix: Convert filtered work/sentence index to global if needed?
-        // The provider's "idx" is the global word index relative to ITS alignment map.
-        // If the map is filtered, we need to map back to original for UI highlighting.
+        // Use the provider's SAVED mapping (not current) for correct word boundary conversion
+        // This is critical when ignoredSentenceIndices changes but provider wasn't reinitialized
+        const providerMap = providerAlignmentMapRef.current;
+        const providerFilteredToGlobal = providerFilteredToGlobalMapRef.current;
 
-        if (filteredToGlobalIndexMap && activeAlignmentMap) {
-          // idx is word index in the filtered text.
-          // We need to find which sentence this word belongs to in filtered map,
-          // get that sentence's global index via filteredToGlobalIndexMap,
-          // then find the corresponding word's global index.
-
-          // This is expensive to do on every word boundary if not optimized.
-          // Optimization: Pre-calculate word-to-word mapping or just sentence mapping.
-          // Simpler: The filtered map's sentences are subsets.
-          // Let's find the sentence in activeAlignmentMap
-
-          // Wait, 'idx' from provider is typically Word Index in the flattened list.
-          // Let's verify 'types.ts'. Yup, typically flattened index.
-          // So we need a map from FilteredWordIndex -> GlobalWordIndex.
-
-          const filteredSentences = activeAlignmentMap.sentences;
+        if (providerMap && providerFilteredToGlobal) {
+          const filteredSentences = providerMap.sentences;
           let wordCount = 0;
           let foundSentenceIdx = -1;
           let wordOffsetInSentence = -1;
@@ -686,11 +784,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
             wordCount += sLen;
           }
           if (foundSentenceIdx !== -1) {
-            const globalSentenceIdx = filteredToGlobalIndexMap[foundSentenceIdx];
+            const globalSentenceIdx = providerFilteredToGlobal[foundSentenceIdx];
             if (typeof globalSentenceIdx === 'number') {
               const globalSentence = alignmentMap?.sentences[globalSentenceIdx];
-              // globalSentence.words[wordOffsetInSentence] is the specific Word object we want.
-              // We need its GLOBAL index (in allWords).
               if (globalSentence && globalSentence.words[wordOffsetInSentence]) {
                 const targetWord = globalSentence.words[wordOffsetInSentence];
                 const globalIdx = wordToGlobalIndex.get(targetWord);
@@ -717,6 +813,11 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       provider.setPlaybackRate(playbackRate);
 
       readingProvider.current = provider;
+
+      // Save the provider's alignment map and filteredToGlobal mapping
+      // These are used for correct word boundary conversion and direct play() calls
+      providerAlignmentMapRef.current = activeAlignmentMap;
+      providerFilteredToGlobalMapRef.current = filteredToGlobalIndexMap ? [...filteredToGlobalIndexMap] : null;
     }
 
     return provider;
@@ -838,10 +939,9 @@ const ReadingPane: React.FC<ReadingPaneProps> = ({ alignmentMap, text, onClose }
       }
 
       debounceTimerRef.current = setTimeout(() => {
-        if (readingProvider.current) {
-          readingProvider.current.play(targetIndex);
-          setIsPaused(false);
-        }
+        // Use handleReadAloud which properly converts global index to filtered index
+        // This is important when ignored sentences change the mapping
+        handleReadAloud(targetIndex);
       }, 300); // 300ms debounce
 
       span.end();

@@ -668,4 +668,46 @@ describe('ReadingPane', () => {
     expect(screen.getByText('ReadAlong')).toBeInTheDocument();
     expect(screen.queryByText('🎧')).not.toBeInTheDocument();
   });
+
+  it('skips to next sentence when current sentence is ignored during playback', async () => {
+    const multiSentenceMap: AlignmentMap = {
+      fullText: "Sentence one. Sentence two. Sentence three.",
+      sentences: [
+        { text: "Sentence one.", index: 0, words: [{ text: "Sentence", index: 0 }, { text: "one", index: 1 }] },
+        { text: "Sentence two.", index: 1, words: [{ text: "Sentence", index: 2 }, { text: "two", index: 3 }] },
+        { text: "Sentence three.", index: 2, words: [{ text: "Sentence", index: 4 }, { text: "three", index: 5 }] }
+      ]
+    };
+
+    render(<ReadingPane alignmentMap={multiSentenceMap} onClose={jest.fn()} />);
+    const ttsButton = screen.getByTitle('Read Aloud');
+
+    // Start reading
+    act(() => { ttsButton.click(); jest.advanceTimersByTime(100); });
+
+    // Trigger onstart and onboundary on first utterance to set current word/sentence
+    const utterances = (mockSpeak.mock.calls as any[]).map(call => call[0]);
+    act(() => {
+      if (utterances[0].onstart) utterances[0].onstart();
+      if (utterances[0].onboundary) utterances[0].onboundary({ name: 'word', charIndex: 0 });
+    });
+
+    // Clear mocks to track subsequent calls
+    mockSpeak.mockClear();
+    mockCancel.mockClear();
+
+    // Find and click ignore button on first sentence (data-sentence-index="0")
+    // The ignore buttons are the 🚫 buttons next to each paragraph
+    const ignoreButtons = screen.getAllByTitle('Ignore');
+    await act(async () => {
+      ignoreButtons[0].click();
+      jest.advanceTimersByTime(100);
+    });
+
+    // Expect playback to restart from sentence 2 (index 1)
+    expect(mockCancel).toHaveBeenCalled();
+    expect(mockSpeak).toHaveBeenCalled();
+    // First call should be "Sentence two" (the next non-ignored sentence)
+    expect((mockSpeak.mock.calls[0][0] as any).text).toContain("two");
+  });
 });

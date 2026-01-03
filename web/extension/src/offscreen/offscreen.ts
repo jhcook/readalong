@@ -9,11 +9,10 @@ let currentBlobUrl: string | null = null;
 
 // Listen for messages from background/content
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.target !== 'OFFSCREEN') return;
-
-    handleMessage(message);
-    // Be async if needed
-    if (message.type === 'PLAY_AUDIO') return true;
+    if (message.target === 'OFFSCREEN') {
+        handleMessage(message);
+    }
+    return false;
 });
 
 async function handleMessage(message: any) {
@@ -105,9 +104,11 @@ audio.addEventListener('ended', () => {
 });
 
 audio.addEventListener('error', (e) => {
-    console.error("[Offscreen] <audio> error", e);
+    const errCode = audio.error ? audio.error.code : 'unknown';
+    const errMsg = audio.error ? audio.error.message : 'Unknown playback error';
+    console.error(`[Offscreen] <audio> error. Code: ${errCode}, Message: ${errMsg}`, e);
     chrome.runtime.sendMessage({
         type: 'AUDIO_ERROR',
-        error: audio.error?.message || 'Unknown playback error'
+        error: `Playback Error (${errCode}): ${errMsg}`
     });
 });

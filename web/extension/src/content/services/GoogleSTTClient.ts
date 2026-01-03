@@ -41,34 +41,51 @@ export class GoogleSTTClient {
             audioBase64 = await base64Promise;
         }
 
-        const response = await new Promise<any>((resolve) => {
-            const timeoutId = setTimeout(() => {
-                console.warn('[GoogleSTTClient] Transcription request timed out after 30s');
-                resolve({ error: 'Timeout waiting for STT response' });
-            }, 30000);
+        return new Promise<WordTimestamp[]>((resolve) => {
+            // Use a long-lived connection to prevent "message channel closed" on long requests
+            const port = chrome.runtime.connect({ name: 'stt_channel' });
 
-            chrome.runtime.sendMessage({
+            // Set a client-side safety timeout (e.g. 2 minutes)
+            const timeoutId = setTimeout(() => {
+                console.warn('[GoogleSTTClient] Transcription request timed out (client-side limit)');
+                port.disconnect();
+                resolve([]);
+            }, 120000);
+
+            port.onMessage.addListener((msg) => {
+                if (msg.success) {
+                    clearTimeout(timeoutId);
+                    resolve(msg.timestamps || []);
+                } else {
+                    console.warn('[GoogleSTTClient] STT Error:', msg.error);
+                    clearTimeout(timeoutId);
+                    resolve([]);
+                }
+                port.disconnect();
+            });
+
+            port.onDisconnect.addListener(() => {
+                clearTimeout(timeoutId);
+                if (chrome.runtime.lastError) {
+                    console.warn('[GoogleSTTClient] Port disconnected with error:', chrome.runtime.lastError.message);
+                } else {
+                    // Logic: if we disconnected without receiving a message (and resolved), 
+                    // it normally means the background script closed the port.
+                    // But we handle success/error above. If we get here pending, assume failure.
+                    console.warn('[GoogleSTTClient] Port disconnected unexpectedly');
+                }
+                // Ensure we resolve if we haven't already (Promise only resolves once)
+                resolve([]);
+            });
+
+            // Send the request
+            port.postMessage({
                 type: 'TRANSCRIBE_AUDIO',
                 payload: {
                     audioBase64,
                     languageCode
                 }
-            }, (res) => {
-                clearTimeout(timeoutId);
-                if (chrome.runtime.lastError) {
-                    console.error('[GoogleSTTClient] Runtime error sending message:', chrome.runtime.lastError);
-                    resolve({ error: chrome.runtime.lastError.message });
-                } else {
-                    resolve(res);
-                }
             });
         });
-
-        if (!response || response.error) {
-            console.warn('[GoogleSTTClient] Transcription failed/skipped:', response?.error || "No response");
-            return [];
-        }
-
-        return response.timestamps || [];
     }
 }

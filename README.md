@@ -1,22 +1,22 @@
-# ReadAlong+: Parent‑Voice Guided Reading System
-A cross‑platform, privacy‑first read‑along experience for children
+# ReadAlong+: Immersive Reading System
+A cross‑platform, privacy‑first read‑along experience for everyone
 Supports Chrome, Firefox, Edge, Safari, iOS, Android
 
 ## Overview
-ReadAlong+ is a hybrid, cross‑platform reading companion that allows children to follow along with stories using parent or cloned voices.
+ReadAlong+ is a hybrid, cross‑platform reading companion that allows users to follow along with stories using custom, personalized voices. While primarily designed to help children develop reading skills through familiar voices (like a parent's), it is built for anyone interested in an immersive reading experience with voices tailored to their liking.
 
 > [!NOTE]
 > **Current Status**: The core functionality is currently available as a **Web Extension** for Chrome, Edge, Firefox, and Safari. The mobile app and standalone web app are in the roadmap.
 
 The system is designed to run on:
 
-A parent’s real voice (captured and aligned locally)
+A custom personalized voice (captured and aligned locally)
 
-A parent’s cloned voice (via ElevenLabs API)
+A high-quality cloned voice (via ElevenLabs API)
 
 Word‑by‑word or sentence‑by‑sentence highlighting
 
-Child‑friendly playback controls (back, forward, pause, repeat)
+Simple playback controls (back, forward, pause, repeat)
 
 The system is designed to run on:
 
@@ -29,8 +29,8 @@ Web via a responsive reading interface
 The architecture prioritizes privacy, offline capability, and high‑quality narration, blending local processing with cloud‑based voice synthesis.
 
 # Key Features
-## Parent Voice Integration
-Local speech‑to‑text using Whisper.cpp  or Vosk
+## Custom Voice Integration
+Local speech‑to‑text using Whisper.cpp or Vosk
 
 Forced alignment to match spoken words with text
 
@@ -50,7 +50,7 @@ Smooth animations
 
 Accessibility‑friendly color schemes
 
-## Child Controls
+## Intuitive Playback Controls
 Play / Pause
 
 Back one sentence
@@ -156,7 +156,7 @@ Forced Alignment Engine
 
 ElevenLabs Integration
 
-Child Playback Controls
+Intuitive Playback Controls
 
 Browser Extensions
 
@@ -198,7 +198,7 @@ IndexedDB
 Secure mobile storage (Keychain/Keystore)
 
 ## Privacy Principles
-Parent voice recordings never leave the device
+Voice recordings never leave the device
 
 No third‑party analytics in child mode
 
@@ -231,7 +231,7 @@ Phase 4 — Mobile App
 iOS + Android with native Whisper modules
 
 Phase 5 — Privacy & UX Hardening
-Child mode, accessibility, performance
+Privacy mode, accessibility, performance
 
 ## Contributing
 Contributions are welcome. Please see:

@@ -28,7 +28,48 @@ Before submitting to any store, ensure:
 2.  **Submit**: Click "Submit a New Add-on".
 3.  **Upload**: Upload `readalong-firefox.zip`.
 4.  **Self-Distribution vs. AMO**: Choose "On this site" for hosting on AMO.
-5.  **Review**: Firefox typically performs an automated review followed by a manual check.
+5.  **Version Notes**: Use this template:
+
+```
+Firefox compatibility fixes:
+- Added data_collection_permissions (required: ["none"]) - extension does not collect any data
+- Implemented fallback audio playback for browsers without offscreen API
+- Removed sandbox.js (vosk-browser STT) as it exceeded 5MB file limit
+
+Regarding validation warnings:
+- "Function constructor is eval": From @opentelemetry tracing library (safe, no user input)
+- "Unsafe innerHTML": All HTML is sanitized via DOMPurify before assignment. Used for:
+  • Rendering sanitized article content in reading pane
+  • Creating temporary DOM elements for text extraction (immediately discarded)
+```
+
+6.  **Notes to Reviewer**:
+
+```
+This extension does not require account credentials to test. Core functionality:
+1. Click extension icon → "Extract Text" to extract content from any webpage
+2. Choose a voice source (System/Browser voices work without API keys)
+3. Click "Read Aloud" to hear the content
+
+Optional cloud voice integrations (ElevenLabs, Google Cloud, Resemble) require user's own API keys entered in Options.
+```
+
+7.  **Review**: Firefox performs automated review followed by manual check.
+
+### Firefox for Android
+
+The extension supports Firefox for Android (v142+) via `gecko_android: {}` in the manifest.
+
+**Known Limitations:**
+- **System voices**: SpeechSynthesis API support varies by Android device
+- **Cloud voices**: Work via audio fallback (ElevenLabs, Google, Resemble)
+- **UI**: Popup displays in mobile view; touch interactions supported
+
+**Testing on Android:**
+1. Install Firefox for Android (v142+)
+2. Navigate to `about:debugging` on desktop Firefox
+3. Use "Connect" to pair with Android device
+4. Install extension via remote debugging, or wait for AMO approval
 
 ## 4. Microsoft Edge Add-ons
 

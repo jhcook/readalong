@@ -5,13 +5,19 @@ let creating: Promise<void> | null = null;
 let activeAudioTabId: number | null = null;
 let offscreenDocumentId: string | null = null; // Track if we created it? Chrome API tracks it.
 
-async function setupOffscreenDocument(path: string) {
+// Firefox fallback: Audio element for playback when offscreen API unavailable
+let fallbackAudio: HTMLAudioElement | null = null;
+let fallbackPlaybackRate: number = 1.0;
+
+async function setupOffscreenDocument(path: string): Promise<boolean> {
+    // Firefox doesn't support offscreen API - use fallback
     if (typeof chrome.offscreen === 'undefined') {
-        throw new Error("Offscreen API not supported in this browser");
+        console.warn('[Background] Offscreen API not available, using fallback audio');
+        return false;
     }
 
     if (await chrome.offscreen.hasDocument()) {
-        return;
+        return true;
     }
 
     if (creating) {
@@ -25,6 +31,73 @@ async function setupOffscreenDocument(path: string) {
         await creating;
         creating = null;
     }
+    return true;
+}
+
+function handleFallbackAudio(message: any): { success: boolean } {
+    switch (message.type) {
+        case 'PLAY_AUDIO':
+            if (fallbackAudio) {
+                fallbackAudio.pause();
+                fallbackAudio = null;
+            }
+            fallbackAudio = new Audio(message.audioData);
+            fallbackAudio.playbackRate = message.playbackRate || fallbackPlaybackRate;
+
+            fallbackAudio.ontimeupdate = () => {
+                if (activeAudioTabId && fallbackAudio) {
+                    chrome.tabs.sendMessage(activeAudioTabId, {
+                        type: 'AUDIO_TIMEUPDATE',
+                        currentTime: fallbackAudio.currentTime
+                    }).catch(() => { });
+                }
+            };
+
+            fallbackAudio.onended = () => {
+                if (activeAudioTabId) {
+                    chrome.tabs.sendMessage(activeAudioTabId, { type: 'AUDIO_ENDED' }).catch(() => { });
+                }
+                fallbackAudio = null;
+            };
+
+            fallbackAudio.onerror = (e) => {
+                if (activeAudioTabId) {
+                    chrome.tabs.sendMessage(activeAudioTabId, {
+                        type: 'AUDIO_ERROR',
+                        error: 'Audio playback failed'
+                    }).catch(() => { });
+                }
+                fallbackAudio = null;
+            };
+
+            fallbackAudio.play().catch(err => {
+                console.error('[Background] Fallback audio play error:', err);
+            });
+            break;
+
+        case 'PAUSE_AUDIO':
+            fallbackAudio?.pause();
+            break;
+
+        case 'RESUME_AUDIO':
+            fallbackAudio?.play().catch(() => { });
+            break;
+
+        case 'STOP_AUDIO':
+            if (fallbackAudio) {
+                fallbackAudio.pause();
+                fallbackAudio = null;
+            }
+            break;
+
+        case 'SET_PLAYBACK_RATE':
+            fallbackPlaybackRate = message.rate || 1.0;
+            if (fallbackAudio) {
+                fallbackAudio.playbackRate = fallbackPlaybackRate;
+            }
+            break;
+    }
+    return { success: true };
 }
 
 export async function handleAudioMessage(
@@ -42,8 +115,15 @@ export async function handleAudioMessage(
             activeAudioTabId = null;
         }
 
-        await setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
-        chrome.runtime.sendMessage({ ...message, target: 'OFFSCREEN' });
+        const hasOffscreen = await setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+
+        if (hasOffscreen) {
+            // Chrome: Use offscreen document
+            chrome.runtime.sendMessage({ ...message, target: 'OFFSCREEN' });
+        } else {
+            // Firefox: Use fallback audio
+            return handleFallbackAudio(message);
+        }
         return { success: true };
     }
 
@@ -90,3 +170,4 @@ export async function handleAudioMessage(
 
     return null;
 }
+

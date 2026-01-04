@@ -24,7 +24,7 @@ try {
 }
 
 // Chrome/Edge (Standard dist)
-execSync(`zip -r ${path.join(RELEASE_DIR, 'readalong-chrome.zip')} .`, { cwd: DIST_DIR });
+execSync(`zip -r ${path.join(RELEASE_DIR, 'readalong-chrome.zip')} . -x "*.DS_Store" -x "__MACOSX/*" -x "icon-original.png"`, { cwd: DIST_DIR });
 console.log('Chrome package created: readalong-chrome.zip');
 
 // Firefox
@@ -36,23 +36,25 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 manifest.browser_specific_settings = {
     gecko: {
         id: "readalong@ccoreilly.github.io",
-        strict_min_version: "109.0"
+        strict_min_version: "120.0"
     }
 };
-// Firefox manifest v3 support for background service workers is partial/different, 
-// usually it wants background.scripts instead of service_worker for some versions,
-// but MV3 is supported now. Keeping as is for now, but adding the ID is crucial.
+// Firefox MV3 uses background.scripts, not service_worker (though it supports SW, scripts is preferred for compatibility/linting)
+if (manifest.background && manifest.background.service_worker) {
+    manifest.background.scripts = [manifest.background.service_worker];
+    delete manifest.background.service_worker;
+}
 
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-execSync(`zip -r ${path.join(RELEASE_DIR, 'readalong-firefox.zip')} .`, { cwd: DIST_FIREFOX_DIR });
+execSync(`zip -r ${path.join(RELEASE_DIR, 'readalong-firefox.zip')} . -x "*.DS_Store" -x "__MACOSX/*" -x "icon-original.png"`, { cwd: DIST_FIREFOX_DIR });
 console.log('Firefox package created: readalong-firefox.zip');
 
 // Safari
 console.log('Packaging for Safari...');
 fs.cpSync(DIST_DIR, DIST_SAFARI_DIR, { recursive: true });
 // Safari usually just needs the folder or the xcode project, providing the zip for distribution
-execSync(`zip -r ${path.join(RELEASE_DIR, 'readalong-safari.zip')} .`, { cwd: DIST_SAFARI_DIR });
+execSync(`zip -r ${path.join(RELEASE_DIR, 'readalong-safari.zip')} . -x "*.DS_Store" -x "__MACOSX/*" -x "icon-original.png"`, { cwd: DIST_SAFARI_DIR });
 console.log('Safari package created: readalong-safari.zip');
 
 console.log('Cleaning up temporary directories...');

@@ -35,7 +35,8 @@ module.exports = {
       patterns: [
         { from: 'public', to: '.' },
         { from: 'src/content/styles.css', to: '.' },
-        { from: 'src/offscreen/offscreen.html', to: '.' }
+        { from: 'src/offscreen/offscreen.html', to: '.' },
+        { from: 'src/sandbox/sandbox.html', to: '.' }
       ],
     }),
   ],

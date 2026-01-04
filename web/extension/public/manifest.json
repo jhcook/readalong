@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ReadAlong",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Extract text from webpages for a clean reading experience.",
   "permissions": [
     "activeTab",

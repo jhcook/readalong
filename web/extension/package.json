@@ -1,6 +1,6 @@
 {
   "name": "readalong-extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -44,6 +44,7 @@
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
     "test": "jest",
-    "package": "node scripts/package.js"
+    "package": "node scripts/package.js",
+    "generate-assets": "node scripts/generate_promo_screenshots.js"
   }
 }

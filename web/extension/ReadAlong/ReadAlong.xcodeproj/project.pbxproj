@@ -750,7 +750,7 @@
 					"-framework",
 					SafariServices,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong;
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong.extension;
 				PRODUCT_NAME = "ReadAlong Extension";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -825,7 +825,7 @@
 					"-framework",
 					WebKit,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.ReadAlong;
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong;
 				PRODUCT_NAME = ReadAlong;
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -905,7 +905,7 @@
 					"-framework",
 					SafariServices,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.ReadAlong.Extension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong.extension;
 				PRODUCT_NAME = "ReadAlong Extension";
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;

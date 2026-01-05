@@ -61,3 +61,8 @@ temp/
 .agent/.state/
 .eslintcache
 .stylelintcache
+
+# Xcode
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/

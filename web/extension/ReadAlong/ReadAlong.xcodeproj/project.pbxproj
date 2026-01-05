@@ -1,0 +1,1094 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D6C9A9902F0B332E0064A1D0 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A98F2F0B332E0064A1D0 /* AppDelegate.swift */; };
+		D6C9A9922F0B332E0064A1D0 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A9912F0B332E0064A1D0 /* SceneDelegate.swift */; };
+		D6C9A9952F0B332E0064A1D0 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9932F0B332E0064A1D0 /* LaunchScreen.storyboard */; };
+		D6C9A9982F0B332E0064A1D0 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9962F0B332E0064A1D0 /* Main.storyboard */; };
+		D6C9A9A12F0B332E0064A1D0 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A9A02F0B332E0064A1D0 /* AppDelegate.swift */; };
+		D6C9A9A42F0B332E0064A1D0 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9A22F0B332E0064A1D0 /* Main.storyboard */; };
+		D6C9A9AB2F0B332E0064A1D0 /* ReadAlong Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6C9A9AA2F0B332E0064A1D0 /* ReadAlong Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D6C9A9B52F0B332E0064A1D0 /* ReadAlong Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6C9A9B42F0B332E0064A1D0 /* ReadAlong Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D6C9A9BA2F0B332E0064A1D0 /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A97F2F0B332C0064A1D0 /* Main.html */; };
+		D6C9A9BB2F0B332E0064A1D0 /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A97F2F0B332C0064A1D0 /* Main.html */; };
+		D6C9A9BC2F0B332E0064A1D0 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9812F0B332C0064A1D0 /* Icon.png */; };
+		D6C9A9BD2F0B332E0064A1D0 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9812F0B332C0064A1D0 /* Icon.png */; };
+		D6C9A9BE2F0B332E0064A1D0 /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9822F0B332C0064A1D0 /* Style.css */; };
+		D6C9A9BF2F0B332E0064A1D0 /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9822F0B332C0064A1D0 /* Style.css */; };
+		D6C9A9C02F0B332E0064A1D0 /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9832F0B332C0064A1D0 /* Script.js */; };
+		D6C9A9C12F0B332E0064A1D0 /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9832F0B332C0064A1D0 /* Script.js */; };
+		D6C9A9C22F0B332E0064A1D0 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A9842F0B332C0064A1D0 /* ViewController.swift */; };
+		D6C9A9C32F0B332E0064A1D0 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A9842F0B332C0064A1D0 /* ViewController.swift */; };
+		D6C9A9C42F0B332E0064A1D0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9852F0B332E0064A1D0 /* Assets.xcassets */; };
+		D6C9A9C52F0B332E0064A1D0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9852F0B332E0064A1D0 /* Assets.xcassets */; };
+		D6C9A9C62F0B332E0064A1D0 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A9872F0B332E0064A1D0 /* SafariWebExtensionHandler.swift */; };
+		D6C9A9C72F0B332E0064A1D0 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C9A9872F0B332E0064A1D0 /* SafariWebExtensionHandler.swift */; };
+		D6C9A9EE2F0B332F0064A1D0 /* icon-16.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9D92F0B332F0064A1D0 /* icon-16.png */; };
+		D6C9A9EF2F0B332F0064A1D0 /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DA2F0B332F0064A1D0 /* popup.js */; };
+		D6C9A9F02F0B332F0064A1D0 /* offscreen.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DB2F0B332F0064A1D0 /* offscreen.html */; };
+		D6C9A9F12F0B332F0064A1D0 /* styles.css in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DC2F0B332F0064A1D0 /* styles.css */; };
+		D6C9A9F22F0B332F0064A1D0 /* popup.js.LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DD2F0B332F0064A1D0 /* popup.js.LICENSE.txt */; };
+		D6C9A9F32F0B332F0064A1D0 /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DE2F0B332F0064A1D0 /* background.js */; };
+		D6C9A9F42F0B332F0064A1D0 /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DF2F0B332F0064A1D0 /* popup.html */; };
+		D6C9A9F52F0B332F0064A1D0 /* options.js.LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E02F0B332F0064A1D0 /* options.js.LICENSE.txt */; };
+		D6C9A9F62F0B332F0064A1D0 /* icon-48.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E12F0B332F0064A1D0 /* icon-48.png */; };
+		D6C9A9F72F0B332F0064A1D0 /* options.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E22F0B332F0064A1D0 /* options.js */; };
+		D6C9A9F82F0B332F0064A1D0 /* icon-original.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E32F0B332F0064A1D0 /* icon-original.png */; };
+		D6C9A9F92F0B332F0064A1D0 /* sandbox.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E42F0B332F0064A1D0 /* sandbox.html */; };
+		D6C9A9FA2F0B332F0064A1D0 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E52F0B332F0064A1D0 /* manifest.json */; };
+		D6C9A9FB2F0B332F0064A1D0 /* offscreen.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E62F0B332F0064A1D0 /* offscreen.js */; };
+		D6C9A9FC2F0B332F0064A1D0 /* options.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E72F0B332F0064A1D0 /* options.html */; };
+		D6C9A9FD2F0B332F0064A1D0 /* content.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E82F0B332F0064A1D0 /* content.js */; };
+		D6C9A9FE2F0B332F0064A1D0 /* sandbox.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E92F0B332F0064A1D0 /* sandbox.js */; };
+		D6C9A9FF2F0B332F0064A1D0 /* audio-processor.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9EA2F0B332F0064A1D0 /* audio-processor.js */; };
+		D6C9AA002F0B332F0064A1D0 /* icon-128.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9EB2F0B332F0064A1D0 /* icon-128.png */; };
+		D6C9AA012F0B332F0064A1D0 /* content.js.LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9EC2F0B332F0064A1D0 /* content.js.LICENSE.txt */; };
+		D6C9AA022F0B332F0064A1D0 /* icon-32.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9ED2F0B332F0064A1D0 /* icon-32.png */; };
+		D6C9AA032F0B332F0064A1D0 /* icon-16.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9D92F0B332F0064A1D0 /* icon-16.png */; };
+		D6C9AA042F0B332F0064A1D0 /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DA2F0B332F0064A1D0 /* popup.js */; };
+		D6C9AA052F0B332F0064A1D0 /* offscreen.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DB2F0B332F0064A1D0 /* offscreen.html */; };
+		D6C9AA062F0B332F0064A1D0 /* styles.css in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DC2F0B332F0064A1D0 /* styles.css */; };
+		D6C9AA072F0B332F0064A1D0 /* popup.js.LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DD2F0B332F0064A1D0 /* popup.js.LICENSE.txt */; };
+		D6C9AA082F0B332F0064A1D0 /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DE2F0B332F0064A1D0 /* background.js */; };
+		D6C9AA092F0B332F0064A1D0 /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9DF2F0B332F0064A1D0 /* popup.html */; };
+		D6C9AA0A2F0B332F0064A1D0 /* options.js.LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E02F0B332F0064A1D0 /* options.js.LICENSE.txt */; };
+		D6C9AA0B2F0B332F0064A1D0 /* icon-48.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E12F0B332F0064A1D0 /* icon-48.png */; };
+		D6C9AA0C2F0B332F0064A1D0 /* options.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E22F0B332F0064A1D0 /* options.js */; };
+		D6C9AA0D2F0B332F0064A1D0 /* icon-original.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E32F0B332F0064A1D0 /* icon-original.png */; };
+		D6C9AA0E2F0B332F0064A1D0 /* sandbox.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E42F0B332F0064A1D0 /* sandbox.html */; };
+		D6C9AA0F2F0B332F0064A1D0 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E52F0B332F0064A1D0 /* manifest.json */; };
+		D6C9AA102F0B332F0064A1D0 /* offscreen.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E62F0B332F0064A1D0 /* offscreen.js */; };
+		D6C9AA112F0B332F0064A1D0 /* options.html in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E72F0B332F0064A1D0 /* options.html */; };
+		D6C9AA122F0B332F0064A1D0 /* content.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E82F0B332F0064A1D0 /* content.js */; };
+		D6C9AA132F0B332F0064A1D0 /* sandbox.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9E92F0B332F0064A1D0 /* sandbox.js */; };
+		D6C9AA142F0B332F0064A1D0 /* audio-processor.js in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9EA2F0B332F0064A1D0 /* audio-processor.js */; };
+		D6C9AA152F0B332F0064A1D0 /* icon-128.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9EB2F0B332F0064A1D0 /* icon-128.png */; };
+		D6C9AA162F0B332F0064A1D0 /* content.js.LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9EC2F0B332F0064A1D0 /* content.js.LICENSE.txt */; };
+		D6C9AA172F0B332F0064A1D0 /* icon-32.png in Resources */ = {isa = PBXBuildFile; fileRef = D6C9A9ED2F0B332F0064A1D0 /* icon-32.png */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D6C9A9AC2F0B332E0064A1D0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D6C9A9792F0B332C0064A1D0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D6C9A9A92F0B332E0064A1D0;
+			remoteInfo = "ReadAlong Extension (iOS)";
+		};
+		D6C9A9B62F0B332E0064A1D0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D6C9A9792F0B332C0064A1D0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D6C9A9B32F0B332E0064A1D0;
+			remoteInfo = "ReadAlong Extension (macOS)";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D6C9A9CD2F0B332E0064A1D0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D6C9A9AB2F0B332E0064A1D0 /* ReadAlong Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9D42F0B332E0064A1D0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D6C9A9B52F0B332E0064A1D0 /* ReadAlong Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		D6C9A9802F0B332C0064A1D0 /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		D6C9A9812F0B332C0064A1D0 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		D6C9A9822F0B332C0064A1D0 /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		D6C9A9832F0B332C0064A1D0 /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		D6C9A9842F0B332C0064A1D0 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		D6C9A9852F0B332E0064A1D0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D6C9A9872F0B332E0064A1D0 /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		D6C9A98C2F0B332E0064A1D0 /* ReadAlong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReadAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6C9A98F2F0B332E0064A1D0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		D6C9A9912F0B332E0064A1D0 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		D6C9A9942F0B332E0064A1D0 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		D6C9A9972F0B332E0064A1D0 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		D6C9A9992F0B332E0064A1D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D6C9A99E2F0B332E0064A1D0 /* ReadAlong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReadAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6C9A9A02F0B332E0064A1D0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		D6C9A9A32F0B332E0064A1D0 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		D6C9A9A52F0B332E0064A1D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D6C9A9AA2F0B332E0064A1D0 /* ReadAlong Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "ReadAlong Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6C9A9AF2F0B332E0064A1D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D6C9A9B42F0B332E0064A1D0 /* ReadAlong Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "ReadAlong Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6C9A9B92F0B332E0064A1D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D6C9A9D92F0B332F0064A1D0 /* icon-16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-16.png"; path = "../../dist/icon-16.png"; sourceTree = "<group>"; };
+		D6C9A9DA2F0B332F0064A1D0 /* popup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = popup.js; path = ../../dist/popup.js; sourceTree = "<group>"; };
+		D6C9A9DB2F0B332F0064A1D0 /* offscreen.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = offscreen.html; path = ../../dist/offscreen.html; sourceTree = "<group>"; };
+		D6C9A9DC2F0B332F0064A1D0 /* styles.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = styles.css; path = ../../dist/styles.css; sourceTree = "<group>"; };
+		D6C9A9DD2F0B332F0064A1D0 /* popup.js.LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = popup.js.LICENSE.txt; path = ../../dist/popup.js.LICENSE.txt; sourceTree = "<group>"; };
+		D6C9A9DE2F0B332F0064A1D0 /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = background.js; path = ../../dist/background.js; sourceTree = "<group>"; };
+		D6C9A9DF2F0B332F0064A1D0 /* popup.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = popup.html; path = ../../dist/popup.html; sourceTree = "<group>"; };
+		D6C9A9E02F0B332F0064A1D0 /* options.js.LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = options.js.LICENSE.txt; path = ../../dist/options.js.LICENSE.txt; sourceTree = "<group>"; };
+		D6C9A9E12F0B332F0064A1D0 /* icon-48.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-48.png"; path = "../../dist/icon-48.png"; sourceTree = "<group>"; };
+		D6C9A9E22F0B332F0064A1D0 /* options.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = options.js; path = ../../dist/options.js; sourceTree = "<group>"; };
+		D6C9A9E32F0B332F0064A1D0 /* icon-original.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-original.png"; path = "../../dist/icon-original.png"; sourceTree = "<group>"; };
+		D6C9A9E42F0B332F0064A1D0 /* sandbox.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = sandbox.html; path = ../../dist/sandbox.html; sourceTree = "<group>"; };
+		D6C9A9E52F0B332F0064A1D0 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../dist/manifest.json; sourceTree = "<group>"; };
+		D6C9A9E62F0B332F0064A1D0 /* offscreen.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = offscreen.js; path = ../../dist/offscreen.js; sourceTree = "<group>"; };
+		D6C9A9E72F0B332F0064A1D0 /* options.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = options.html; path = ../../dist/options.html; sourceTree = "<group>"; };
+		D6C9A9E82F0B332F0064A1D0 /* content.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = content.js; path = ../../dist/content.js; sourceTree = "<group>"; };
+		D6C9A9E92F0B332F0064A1D0 /* sandbox.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = sandbox.js; path = ../../dist/sandbox.js; sourceTree = "<group>"; };
+		D6C9A9EA2F0B332F0064A1D0 /* audio-processor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "audio-processor.js"; path = "../../dist/audio-processor.js"; sourceTree = "<group>"; };
+		D6C9A9EB2F0B332F0064A1D0 /* icon-128.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-128.png"; path = "../../dist/icon-128.png"; sourceTree = "<group>"; };
+		D6C9A9EC2F0B332F0064A1D0 /* content.js.LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = content.js.LICENSE.txt; path = ../../dist/content.js.LICENSE.txt; sourceTree = "<group>"; };
+		D6C9A9ED2F0B332F0064A1D0 /* icon-32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-32.png"; path = "../../dist/icon-32.png"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D6C9A9892F0B332E0064A1D0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A99B2F0B332E0064A1D0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9A72F0B332E0064A1D0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9B12F0B332E0064A1D0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D6C9A9782F0B332B0064A1D0 = {
+			isa = PBXGroup;
+			children = (
+				D6C9A97D2F0B332C0064A1D0 /* Shared (App) */,
+				D6C9A9862F0B332E0064A1D0 /* Shared (Extension) */,
+				D6C9A98E2F0B332E0064A1D0 /* iOS (App) */,
+				D6C9A99F2F0B332E0064A1D0 /* macOS (App) */,
+				D6C9A9AE2F0B332E0064A1D0 /* iOS (Extension) */,
+				D6C9A9B82F0B332E0064A1D0 /* macOS (Extension) */,
+				D6C9A98D2F0B332E0064A1D0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D6C9A97D2F0B332C0064A1D0 /* Shared (App) */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A9842F0B332C0064A1D0 /* ViewController.swift */,
+				D6C9A9852F0B332E0064A1D0 /* Assets.xcassets */,
+				D6C9A97E2F0B332C0064A1D0 /* Resources */,
+			);
+			path = "Shared (App)";
+			sourceTree = "<group>";
+		};
+		D6C9A97E2F0B332C0064A1D0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A97F2F0B332C0064A1D0 /* Main.html */,
+				D6C9A9812F0B332C0064A1D0 /* Icon.png */,
+				D6C9A9822F0B332C0064A1D0 /* Style.css */,
+				D6C9A9832F0B332C0064A1D0 /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		D6C9A9862F0B332E0064A1D0 /* Shared (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A9D82F0B332F0064A1D0 /* Resources */,
+				D6C9A9872F0B332E0064A1D0 /* SafariWebExtensionHandler.swift */,
+			);
+			path = "Shared (Extension)";
+			sourceTree = "<group>";
+		};
+		D6C9A98D2F0B332E0064A1D0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A98C2F0B332E0064A1D0 /* ReadAlong.app */,
+				D6C9A99E2F0B332E0064A1D0 /* ReadAlong.app */,
+				D6C9A9AA2F0B332E0064A1D0 /* ReadAlong Extension.appex */,
+				D6C9A9B42F0B332E0064A1D0 /* ReadAlong Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D6C9A98E2F0B332E0064A1D0 /* iOS (App) */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A98F2F0B332E0064A1D0 /* AppDelegate.swift */,
+				D6C9A9912F0B332E0064A1D0 /* SceneDelegate.swift */,
+				D6C9A9932F0B332E0064A1D0 /* LaunchScreen.storyboard */,
+				D6C9A9962F0B332E0064A1D0 /* Main.storyboard */,
+				D6C9A9992F0B332E0064A1D0 /* Info.plist */,
+			);
+			path = "iOS (App)";
+			sourceTree = "<group>";
+		};
+		D6C9A99F2F0B332E0064A1D0 /* macOS (App) */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A9A02F0B332E0064A1D0 /* AppDelegate.swift */,
+				D6C9A9A22F0B332E0064A1D0 /* Main.storyboard */,
+				D6C9A9A52F0B332E0064A1D0 /* Info.plist */,
+			);
+			path = "macOS (App)";
+			sourceTree = "<group>";
+		};
+		D6C9A9AE2F0B332E0064A1D0 /* iOS (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A9AF2F0B332E0064A1D0 /* Info.plist */,
+			);
+			path = "iOS (Extension)";
+			sourceTree = "<group>";
+		};
+		D6C9A9B82F0B332E0064A1D0 /* macOS (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A9B92F0B332E0064A1D0 /* Info.plist */,
+			);
+			path = "macOS (Extension)";
+			sourceTree = "<group>";
+		};
+		D6C9A9D82F0B332F0064A1D0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D6C9A9D92F0B332F0064A1D0 /* icon-16.png */,
+				D6C9A9DA2F0B332F0064A1D0 /* popup.js */,
+				D6C9A9DB2F0B332F0064A1D0 /* offscreen.html */,
+				D6C9A9DC2F0B332F0064A1D0 /* styles.css */,
+				D6C9A9DD2F0B332F0064A1D0 /* popup.js.LICENSE.txt */,
+				D6C9A9DE2F0B332F0064A1D0 /* background.js */,
+				D6C9A9DF2F0B332F0064A1D0 /* popup.html */,
+				D6C9A9E02F0B332F0064A1D0 /* options.js.LICENSE.txt */,
+				D6C9A9E12F0B332F0064A1D0 /* icon-48.png */,
+				D6C9A9E22F0B332F0064A1D0 /* options.js */,
+				D6C9A9E32F0B332F0064A1D0 /* icon-original.png */,
+				D6C9A9E42F0B332F0064A1D0 /* sandbox.html */,
+				D6C9A9E52F0B332F0064A1D0 /* manifest.json */,
+				D6C9A9E62F0B332F0064A1D0 /* offscreen.js */,
+				D6C9A9E72F0B332F0064A1D0 /* options.html */,
+				D6C9A9E82F0B332F0064A1D0 /* content.js */,
+				D6C9A9E92F0B332F0064A1D0 /* sandbox.js */,
+				D6C9A9EA2F0B332F0064A1D0 /* audio-processor.js */,
+				D6C9A9EB2F0B332F0064A1D0 /* icon-128.png */,
+				D6C9A9EC2F0B332F0064A1D0 /* content.js.LICENSE.txt */,
+				D6C9A9ED2F0B332F0064A1D0 /* icon-32.png */,
+			);
+			name = Resources;
+			path = "Shared (Extension)";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D6C9A98B2F0B332E0064A1D0 /* ReadAlong (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6C9A9CE2F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong (iOS)" */;
+			buildPhases = (
+				D6C9A9882F0B332E0064A1D0 /* Sources */,
+				D6C9A9892F0B332E0064A1D0 /* Frameworks */,
+				D6C9A98A2F0B332E0064A1D0 /* Resources */,
+				D6C9A9CD2F0B332E0064A1D0 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D6C9A9AD2F0B332E0064A1D0 /* PBXTargetDependency */,
+			);
+			name = "ReadAlong (iOS)";
+			packageProductDependencies = (
+			);
+			productName = "ReadAlong (iOS)";
+			productReference = D6C9A98C2F0B332E0064A1D0 /* ReadAlong.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D6C9A99D2F0B332E0064A1D0 /* ReadAlong (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6C9A9D52F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong (macOS)" */;
+			buildPhases = (
+				D6C9A99A2F0B332E0064A1D0 /* Sources */,
+				D6C9A99B2F0B332E0064A1D0 /* Frameworks */,
+				D6C9A99C2F0B332E0064A1D0 /* Resources */,
+				D6C9A9D42F0B332E0064A1D0 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D6C9A9B72F0B332E0064A1D0 /* PBXTargetDependency */,
+			);
+			name = "ReadAlong (macOS)";
+			packageProductDependencies = (
+			);
+			productName = "ReadAlong (macOS)";
+			productReference = D6C9A99E2F0B332E0064A1D0 /* ReadAlong.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D6C9A9A92F0B332E0064A1D0 /* ReadAlong Extension (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6C9A9CA2F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong Extension (iOS)" */;
+			buildPhases = (
+				D6C9A9A62F0B332E0064A1D0 /* Sources */,
+				D6C9A9A72F0B332E0064A1D0 /* Frameworks */,
+				D6C9A9A82F0B332E0064A1D0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ReadAlong Extension (iOS)";
+			packageProductDependencies = (
+			);
+			productName = "ReadAlong Extension (iOS)";
+			productReference = D6C9A9AA2F0B332E0064A1D0 /* ReadAlong Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D6C9A9B32F0B332E0064A1D0 /* ReadAlong Extension (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6C9A9D12F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong Extension (macOS)" */;
+			buildPhases = (
+				D6C9A9B02F0B332E0064A1D0 /* Sources */,
+				D6C9A9B12F0B332E0064A1D0 /* Frameworks */,
+				D6C9A9B22F0B332E0064A1D0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ReadAlong Extension (macOS)";
+			packageProductDependencies = (
+			);
+			productName = "ReadAlong Extension (macOS)";
+			productReference = D6C9A9B42F0B332E0064A1D0 /* ReadAlong Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D6C9A9792F0B332C0064A1D0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					D6C9A98B2F0B332E0064A1D0 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					D6C9A99D2F0B332E0064A1D0 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					D6C9A9A92F0B332E0064A1D0 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					D6C9A9B32F0B332E0064A1D0 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = D6C9A97C2F0B332C0064A1D0 /* Build configuration list for PBXProject "ReadAlong" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D6C9A9782F0B332B0064A1D0;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D6C9A98D2F0B332E0064A1D0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D6C9A98B2F0B332E0064A1D0 /* ReadAlong (iOS) */,
+				D6C9A99D2F0B332E0064A1D0 /* ReadAlong (macOS) */,
+				D6C9A9A92F0B332E0064A1D0 /* ReadAlong Extension (iOS) */,
+				D6C9A9B32F0B332E0064A1D0 /* ReadAlong Extension (macOS) */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D6C9A98A2F0B332E0064A1D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9BC2F0B332E0064A1D0 /* Icon.png in Resources */,
+				D6C9A9952F0B332E0064A1D0 /* LaunchScreen.storyboard in Resources */,
+				D6C9A9BA2F0B332E0064A1D0 /* Main.html in Resources */,
+				D6C9A9C02F0B332E0064A1D0 /* Script.js in Resources */,
+				D6C9A9C42F0B332E0064A1D0 /* Assets.xcassets in Resources */,
+				D6C9A9982F0B332E0064A1D0 /* Main.storyboard in Resources */,
+				D6C9A9BE2F0B332E0064A1D0 /* Style.css in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A99C2F0B332E0064A1D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9BD2F0B332E0064A1D0 /* Icon.png in Resources */,
+				D6C9A9BF2F0B332E0064A1D0 /* Style.css in Resources */,
+				D6C9A9A42F0B332E0064A1D0 /* Main.storyboard in Resources */,
+				D6C9A9C12F0B332E0064A1D0 /* Script.js in Resources */,
+				D6C9A9C52F0B332E0064A1D0 /* Assets.xcassets in Resources */,
+				D6C9A9BB2F0B332E0064A1D0 /* Main.html in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9A82F0B332E0064A1D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9AA122F0B332F0064A1D0 /* content.js in Resources */,
+				D6C9AA092F0B332F0064A1D0 /* popup.html in Resources */,
+				D6C9AA032F0B332F0064A1D0 /* icon-16.png in Resources */,
+				D6C9AA112F0B332F0064A1D0 /* options.html in Resources */,
+				D6C9AA0B2F0B332F0064A1D0 /* icon-48.png in Resources */,
+				D6C9AA0F2F0B332F0064A1D0 /* manifest.json in Resources */,
+				D6C9AA102F0B332F0064A1D0 /* offscreen.js in Resources */,
+				D6C9AA162F0B332F0064A1D0 /* content.js.LICENSE.txt in Resources */,
+				D6C9AA062F0B332F0064A1D0 /* styles.css in Resources */,
+				D6C9AA052F0B332F0064A1D0 /* offscreen.html in Resources */,
+				D6C9AA152F0B332F0064A1D0 /* icon-128.png in Resources */,
+				D6C9AA172F0B332F0064A1D0 /* icon-32.png in Resources */,
+				D6C9AA132F0B332F0064A1D0 /* sandbox.js in Resources */,
+				D6C9AA142F0B332F0064A1D0 /* audio-processor.js in Resources */,
+				D6C9AA0A2F0B332F0064A1D0 /* options.js.LICENSE.txt in Resources */,
+				D6C9AA0E2F0B332F0064A1D0 /* sandbox.html in Resources */,
+				D6C9AA042F0B332F0064A1D0 /* popup.js in Resources */,
+				D6C9AA0D2F0B332F0064A1D0 /* icon-original.png in Resources */,
+				D6C9AA082F0B332F0064A1D0 /* background.js in Resources */,
+				D6C9AA072F0B332F0064A1D0 /* popup.js.LICENSE.txt in Resources */,
+				D6C9AA0C2F0B332F0064A1D0 /* options.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9B22F0B332E0064A1D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9FD2F0B332F0064A1D0 /* content.js in Resources */,
+				D6C9A9F42F0B332F0064A1D0 /* popup.html in Resources */,
+				D6C9A9EE2F0B332F0064A1D0 /* icon-16.png in Resources */,
+				D6C9A9FC2F0B332F0064A1D0 /* options.html in Resources */,
+				D6C9A9F62F0B332F0064A1D0 /* icon-48.png in Resources */,
+				D6C9A9FA2F0B332F0064A1D0 /* manifest.json in Resources */,
+				D6C9A9FB2F0B332F0064A1D0 /* offscreen.js in Resources */,
+				D6C9AA012F0B332F0064A1D0 /* content.js.LICENSE.txt in Resources */,
+				D6C9A9F12F0B332F0064A1D0 /* styles.css in Resources */,
+				D6C9A9F02F0B332F0064A1D0 /* offscreen.html in Resources */,
+				D6C9AA002F0B332F0064A1D0 /* icon-128.png in Resources */,
+				D6C9AA022F0B332F0064A1D0 /* icon-32.png in Resources */,
+				D6C9A9FE2F0B332F0064A1D0 /* sandbox.js in Resources */,
+				D6C9A9FF2F0B332F0064A1D0 /* audio-processor.js in Resources */,
+				D6C9A9F52F0B332F0064A1D0 /* options.js.LICENSE.txt in Resources */,
+				D6C9A9F92F0B332F0064A1D0 /* sandbox.html in Resources */,
+				D6C9A9EF2F0B332F0064A1D0 /* popup.js in Resources */,
+				D6C9A9F82F0B332F0064A1D0 /* icon-original.png in Resources */,
+				D6C9A9F32F0B332F0064A1D0 /* background.js in Resources */,
+				D6C9A9F22F0B332F0064A1D0 /* popup.js.LICENSE.txt in Resources */,
+				D6C9A9F72F0B332F0064A1D0 /* options.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D6C9A9882F0B332E0064A1D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9C22F0B332E0064A1D0 /* ViewController.swift in Sources */,
+				D6C9A9902F0B332E0064A1D0 /* AppDelegate.swift in Sources */,
+				D6C9A9922F0B332E0064A1D0 /* SceneDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A99A2F0B332E0064A1D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9C32F0B332E0064A1D0 /* ViewController.swift in Sources */,
+				D6C9A9A12F0B332E0064A1D0 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9A62F0B332E0064A1D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9C62F0B332E0064A1D0 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D6C9A9B02F0B332E0064A1D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6C9A9C72F0B332E0064A1D0 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D6C9A9AD2F0B332E0064A1D0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D6C9A9A92F0B332E0064A1D0 /* ReadAlong Extension (iOS) */;
+			targetProxy = D6C9A9AC2F0B332E0064A1D0 /* PBXContainerItemProxy */;
+		};
+		D6C9A9B72F0B332E0064A1D0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D6C9A9B32F0B332E0064A1D0 /* ReadAlong Extension (macOS) */;
+			targetProxy = D6C9A9B62F0B332E0064A1D0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		D6C9A97F2F0B332C0064A1D0 /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D6C9A9802F0B332C0064A1D0 /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		D6C9A9932F0B332E0064A1D0 /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D6C9A9942F0B332E0064A1D0 /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		D6C9A9962F0B332E0064A1D0 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D6C9A9972F0B332E0064A1D0 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+		D6C9A9A22F0B332E0064A1D0 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D6C9A9A32F0B332E0064A1D0 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		D6C9A9C82F0B332E0064A1D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		D6C9A9C92F0B332E0064A1D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		D6C9A9CB2F0B332E0064A1D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "ReadAlong Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong;
+				PRODUCT_NAME = "ReadAlong Extension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D6C9A9CC2F0B332E0064A1D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "ReadAlong Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong.extension;
+				PRODUCT_NAME = "ReadAlong Extension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D6C9A9CF2F0B332E0064A1D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = ReadAlong;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.ReadAlong;
+				PRODUCT_NAME = ReadAlong;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D6C9A9D02F0B332E0064A1D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = ReadAlong;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong;
+				PRODUCT_NAME = ReadAlong;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D6C9A9D22F0B332E0064A1D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "ReadAlong Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.ReadAlong.Extension;
+				PRODUCT_NAME = "ReadAlong Extension";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D6C9A9D32F0B332E0064A1D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "ReadAlong Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong.extension;
+				PRODUCT_NAME = "ReadAlong Extension";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D6C9A9D62F0B332E0064A1D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = ReadAlong;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong;
+				PRODUCT_NAME = ReadAlong;
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D6C9A9D72F0B332E0064A1D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P64B35CR4Q;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = ReadAlong;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.secnix.readalong;
+				PRODUCT_NAME = ReadAlong;
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D6C9A97C2F0B332C0064A1D0 /* Build configuration list for PBXProject "ReadAlong" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6C9A9C82F0B332E0064A1D0 /* Debug */,
+				D6C9A9C92F0B332E0064A1D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6C9A9CA2F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong Extension (iOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6C9A9CB2F0B332E0064A1D0 /* Debug */,
+				D6C9A9CC2F0B332E0064A1D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6C9A9CE2F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong (iOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6C9A9CF2F0B332E0064A1D0 /* Debug */,
+				D6C9A9D02F0B332E0064A1D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6C9A9D12F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong Extension (macOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6C9A9D22F0B332E0064A1D0 /* Debug */,
+				D6C9A9D32F0B332E0064A1D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6C9A9D52F0B332E0064A1D0 /* Build configuration list for PBXNativeTarget "ReadAlong (macOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6C9A9D62F0B332E0064A1D0 /* Debug */,
+				D6C9A9D72F0B332E0064A1D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D6C9A9792F0B332C0064A1D0 /* Project object */;
+}
